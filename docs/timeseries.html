@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=, initial-scale=1.0">
+  <title>Timeseries pesticide use</title>
+  <script
+  src="https://unpkg.com/@open-spatial-lab/full-bundle"
+  type="module"
+  async></script>
+</head>
+<body>
+  <div style="width:100%;height:auto">
+
+    <sp-theme>
+      <h1>California Pesticide Use Data Explorer</h1>
+    </sp-theme>
+    <osl-eq-grid>
+      <div>
+        <osl-modal
+        label="Additional Filters"
+        title="Filter Data"
+        size="l"
+      >
+        <div style="min-width:80vw;min-height:80vh; overflow-y:auto;">
+          <h3>Active Ingredients</h3>
+          <osl-eq-grid breakpoint="lg">
+            <osl-select-control
+              data=["https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411c780611480008f7ecd2","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411d590611480008f7ecd3","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a184586ce4600082f1a4f","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1d0b7ec37d000880178e","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1c9d0e307800080dbc9d"]
+              option="ai_class"
+              multipleSelect="true"
+              title="Active Ingredient Class"
+              label="Search for AI classes"
+              optionsData=https://d3lsdszfx9jqxt.cloudfront.net/data-query/6567637aaeb11300087fbd82
+              optionsDataValueColumn="ai_class"
+              initialValue="*"
+            ></osl-select-control>
+            <osl-select-control
+              data=["https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411c780611480008f7ecd2","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411d590611480008f7ecd3","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a184586ce4600082f1a4f","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1d0b7ec37d000880178e","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1c9d0e307800080dbc9d"]
+              option="ai_type"
+              multipleSelect="true"
+              title="Active Ingredient Type"
+              optionsData=https://d3lsdszfx9jqxt.cloudfront.net/data-query/6567630eaeb11300087fbd80
+              optionsDataValueColumn="ai_type"
+              initialValue="*"
+            ></osl-select-control>
+            <osl-select-control
+              data=["https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411c780611480008f7ecd2","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411d590611480008f7ecd3","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a184586ce4600082f1a4f","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1d0b7ec37d000880178e","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1c9d0e307800080dbc9d"]
+              option="ai_type_specific"
+              optionsData=https://d3lsdszfx9jqxt.cloudfront.net/data-query/656763b1aeb11300087fbd83
+              optionsDataValueColumn="ai_type_specific"
+              multipleSelect="true"
+              title="Active Ingredient Type (Specific)"
+              initialValue="*"
+            ></osl-select-control
+          ></osl-eq-grid>
+          <hr style="margin:2rem 0 1rem 0" />
+          <osl-eq-grid breakpoint="lg">
+            <div>
+              <h3>Commodity Type</h3>
+    
+              <osl-select-control
+                data=["https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411c780611480008f7ecd2","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411d590611480008f7ecd3","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a184586ce4600082f1a4f","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1d0b7ec37d000880178e","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1c9d0e307800080dbc9d"]
+                option="site"
+                title="Location that pesticide was applied to"
+                initialValue="*"
+                multipleSelect
+                optionsData=https://d3lsdszfx9jqxt.cloudfront.net/data-query/65676456aeb11300087fbd85
+                optionsDataLabelColumn="site_name"
+                optionsDataValueColumn="site_code"
+              ></osl-select-control>
+            </div>
+            <div>
+              <h3>Application Site Type</h3>
+              <osl-radio
+                data=["https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411c780611480008f7ecd2","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411d590611480008f7ecd3","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a184586ce4600082f1a4f","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1d0b7ec37d000880178e","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1c9d0e307800080dbc9d"]
+                option="usetype"
+                initialValue="ag"
+                options=[{"label":"Agricultural","value":"ag"},{"label":"Non-Agricultural (County Only)","value":"nonag"},{"label":"Both  (County Only)","value":"*"}]
+              >
+              </osl-radio>
+            </div>
+          </osl-eq-grid>
+          <hr style="margin:2rem 0 1rem 0" />
+          <osl-eq-grid breakpoint="lg">
+            <div>
+              <h3>Specific Chemical(s)</h3>
+    
+              <osl-select-control
+                data=["https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411c780611480008f7ecd2","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411d590611480008f7ecd3","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a184586ce4600082f1a4f","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1d0b7ec37d000880178e","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1c9d0e307800080dbc9d"]
+                option="chemical"
+                multipleSelect="true"
+                title="Specific Chemical(s)"
+                initialValue="*"
+                optionsData=https://d3lsdszfx9jqxt.cloudfront.net/data-query/65675fb7b041550008c7b6ba
+                optionsDataLabelColumn="chem_name"
+                optionsDataValueColumn="chem_code"
+              ></osl-select-control>
+              <!-- chemical -->
+            </div>
+            <div>
+              <h3>Specific Product(s)</h3>
+    
+              <osl-select-control
+                data=["https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411c780611480008f7ecd2","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411d590611480008f7ecd3","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a184586ce4600082f1a4f","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1d0b7ec37d000880178e","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1c9d0e307800080dbc9d"]
+                option="product"
+                multipleSelect="true"
+                title="Specific Chemical(s)"
+                initialValue="*"
+                optionsData=https://d3lsdszfx9jqxt.cloudfront.net/data-query/6542775ca570c6000898f983
+                optionsDataLabelColumn="product_name"
+                optionsDataValueColumn="product_code"
+              ></osl-select-control>
+            </div>
+          </osl-eq-grid>
+          <hr style="margin:2rem 0 1rem 0" />
+          <osl-eq-grid breakpoint="lg">
+            <div>
+              <h3>Filter by County</h3>
+              <osl-chips
+                data=["https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411c780611480008f7ecd2","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411d590611480008f7ecd3","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a184586ce4600082f1a4f","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1d0b7ec37d000880178e","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1c9d0e307800080dbc9d"]
+                initialValue="[]"
+                title="County"
+                option="county"
+                label="Enter county name to filter options"
+                optionsData=https://d3lsdszfx9jqxt.cloudfront.net/data-query/6567683eafda330008b8c256
+                optionsDataValueColumn="FIPS"
+                optionsDataLabelColumn="Area Name"
+                showAllOptions="true"
+                maxOptions="50"
+              ></osl-chips>
+            </div>
+            <div>
+              <h3>Filter by Township</h3>
+              <osl-chips
+                data=["https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411c780611480008f7ecd2","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411d590611480008f7ecd3","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a184586ce4600082f1a4f","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1d0b7ec37d000880178e","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1c9d0e307800080dbc9d"]
+                initialValue="[]"
+                title="Township"
+                option="townshiprange"
+                label="Enter township ID to filter options"
+                optionsData=https://d3lsdszfx9jqxt.cloudfront.net/data-query/6569009ee5a32a0008930614
+                optionsDataValueColumn="TownshipRange"
+                showAllOptions="true"
+                maxOptions="50"
+              ></osl-chips>
+            </div>
+            <div>
+              <h3>Filter by School District</h3>
+    
+              <osl-chips
+                data=["https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411c780611480008f7ecd2","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411d590611480008f7ecd3","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a184586ce4600082f1a4f","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1d0b7ec37d000880178e","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1c9d0e307800080dbc9d"]
+                initialValue="[]"
+                title="School District"
+                option="schooldistrict"
+                label="Enter zip code to filter options"
+                optionsData=https://d3lsdszfx9jqxt.cloudfront.net/data-query/656789dcb678c50008c54a00
+                optionsDataValueColumn="FIPS"
+                optionsDataLabelColumn="Area Name"
+                showAllOptions="true"
+                maxOptions="50"
+              ></osl-chips>
+            </div>
+    
+            <div>
+              <h3>Filter by Census Tract</h3>
+              <osl-chips
+                data=["https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411c780611480008f7ecd2","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411d590611480008f7ecd3","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a184586ce4600082f1a4f","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1d0b7ec37d000880178e","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1c9d0e307800080dbc9d"]
+                initialValue="[]"
+                title="Tract"
+                option="tract"
+                label="Enter tract ID to filter options"
+                optionsData=https://d3lsdszfx9jqxt.cloudfront.net/data-query/656763f6aeb11300087fbd84
+                optionsDataValueColumn="FIPS"
+                showAllOptions="true"
+                maxOptions="50"
+              ></osl-chips>
+            </div>
+          </osl-eq-grid>
+    
+          <hr style="margin:2rem 0 1rem 0" />
+          
+        </div>
+      </osl-modal>
+      </div>
+      <div>
+        <osl-param-view
+          data=https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf
+          parameters=["start","end","ai_class","ai_type","ai_type_specific","site","usetype","county","township","schooldistrict","tract"]
+          labels=["Start Date","End Date","Active Ingredient Class","Active Ingredient Type","Active Ingredient Type Specific","Site Type / Commodity","Use Type (ag/nonag)","County","Township","School District","Census Tract"]
+          parameterTitle="Filter"
+          title="Current Data Filters"
+        ></osl-param-view>
+      </div>
+    </osl-eq-grid>
+    <hr style="margin:2rem 0 1rem 0;"/>
+    <osl-tabs breakpoint="lg">
+      <div data-tab="By Year">
+        <div style="width:100%;height:40vh;position:relative">
+          <h3>Use over time by Active Ingredient Class</h3>
+            <osl-plot
+              colorLegend="true"
+              data=https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a184586ce4600082f1a4f
+              marginBottom="80"
+              marginLeft="80"
+              marginRight="80"
+              colorScheme="accent"
+            >
+              <osl-line
+                x="date"
+                y="lbs_chm_used"
+                stroke="ai_class"
+              ></osl-line>
+            </osl-plot>
+          </div>
+          <br /><br />
+        <div style="width:100%;height:40vh;position:relative">
+          <h3>Use over time by Active Ingredient Type</h3>
+          <osl-plot
+            colorLegend="true"
+            data=https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1d0b7ec37d000880178e
+            marginBottom="80"
+            marginLeft="80"
+            marginRight="80"
+            
+            colorScheme="turbo"
+          >
+            <osl-line
+              x="date"
+              y="lbs_chm_used"
+              stroke="ai_type"
+              colorscheme="tableau10"
+            ></osl-line>
+          </osl-plot>
+        </div>
+        <div style="width:100%;height:40vh;position:relative">
+          <h3>Use over time by Agricultural or Non-Agricultural Use</h3>
+          <osl-plot
+            colorLegend="true"
+            data=https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1c9d0e307800080dbc9d
+            marginBottom="80"
+            marginLeft="80"
+            marginRight="80"
+          >
+            <osl-line
+              x="date"
+              y="lbs_chm_used"
+              stroke="usetype"
+            ></osl-line>
+          </osl-plot>
+        </div>
+      </div>
+      <div data-tab="By Month">
+        <div>
+          <osl-select-control
+            data=["https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411c780611480008f7ecd2","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411d590611480008f7ecd3","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a184586ce4600082f1a4f","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1d0b7ec37d000880178e","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1c9d0e307800080dbc9d"]
+            option="start"
+            options=["2017-01","2017-02","2017-03","2017-04","2017-05","2017-06","2017-07","2017-08","2017-09","2017-10","2017-11","2017-12","2018-01","2018-02","2018-03","2018-04","2018-05","2018-06","2018-07","2018-08","2018-09","2018-10","2018-11","2018-12","2019-01","2019-02","2019-03","2019-04","2019-05","2019-06","2019-07","2019-08","2019-09","2019-10","2019-11","2019-12","2020-01","2020-02","2020-03","2020-04","2020-05","2020-06","2020-07","2020-08","2020-09","2020-10","2020-11","2020-12","2021-01","2021-02","2021-03","2021-04","2021-05","2021-06","2021-07","2021-08","2021-09","2021-10","2021-11","2021-12"]
+            title="Start Date"
+            initialValue="2017-01"
+          ></osl-select-control>
+          <osl-select-control
+            data=["https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411c780611480008f7ecd2","https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411d590611480008f7ecd3","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a184586ce4600082f1a4f","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1d0b7ec37d000880178e","https://d3lsdszfx9jqxt.cloudfront.net/data-query/656a1c9d0e307800080dbc9d"]
+            option="end"
+            options=["2017-01","2017-02","2017-03","2017-04","2017-05","2017-06","2017-07","2017-08","2017-09","2017-10","2017-11","2017-12","2018-01","2018-02","2018-03","2018-04","2018-05","2018-06","2018-07","2018-08","2018-09","2018-10","2018-11","2018-12","2019-01","2019-02","2019-03","2019-04","2019-05","2019-06","2019-07","2019-08","2019-09","2019-10","2019-11","2019-12","2020-01","2020-02","2020-03","2020-04","2020-05","2020-06","2020-07","2020-08","2020-09","2020-10","2020-11","2020-12","2021-01","2021-02","2021-03","2021-04","2021-05","2021-06","2021-07","2021-08","2021-09","2021-10","2021-11","2021-12"]
+            title="End Date"
+            initialValue="2021-12"
+          ></osl-select-control>
+        </div>
+      <div style="width:100%;height:40vh;position:relative">
+        <h3>Use over time by Active Ingredient Class</h3>
+        <osl-plot
+          colorLegend="true"
+          data=https://d3lsdszfx9jqxt.cloudfront.net/data-query/65410c3b5c8aac0008d57dbf
+          marginBottom="80"
+          marginLeft="80"
+          marginRight="80"
+          colorScheme="accent"
+        >
+          <osl-line
+            x="date"
+            y="lbs_chm_used"
+            stroke="ai_class"
+          ></osl-line>
+        </osl-plot>
+      </div>
+      <br /><br />
+      <div style="width:100%;height:40vh;position:relative">
+        <h3>Use over time by Active Ingredient Type</h3>
+        <osl-plot
+          colorLegend="true"
+          data=https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411c780611480008f7ecd2
+          marginBottom="80"
+          marginLeft="80"
+          marginRight="80"
+          
+          colorScheme="turbo"
+        >
+          <osl-line
+            x="date"
+            y="lbs_chm_used"
+            stroke="ai_type"
+            colorscheme="tableau10"
+          ></osl-line>
+          </osl-plot>
+        </div>
+        <div style="width:100%;height:40vh;position:relative">
+          <h3>Use over time by Agricultural or Non-Agricultural Use</h3>
+          <osl-plot
+            colorLegend="true"
+            data=https://d3lsdszfx9jqxt.cloudfront.net/data-query/65411d590611480008f7ecd3
+            marginBottom="80"
+            marginLeft="80"
+            marginRight="80"
+          >
+            <osl-line
+              x="date"
+              y="lbs_chm_used"
+              stroke="usetype"
+            ></osl-line>
+          </osl-plot>
+        </div>
+      </div>
+    </osl-tabs>
+  </div>
+</body>
+</html>
