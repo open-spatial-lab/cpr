@@ -24,5 +24,20 @@ def concat_gdfs():
   files  = glob("../data/sections/*.zip")
   gdf = pd.concat([gpd.read_file(f) for f in files])
   gdf = gdf.to_crs("EPSG:4326")
+  # dissolve by CO_MTRS
+  gdf = gdf.dissolve(by='CO_MTRS').reset_index()
   gdf.to_parquet("../data/sections/sections.parquet")
   gdf.to_file("../data/sections/sections.geojson", driver='GeoJSON')
+
+# %%
+download_all()
+# %%
+concat_gdfs()
+# %%
+sections = gpd.read_parquet("../data/sections/sections.parquet")
+# # %%
+# sections['polygon'] = sections['geometry']
+# # %%
+# duplicated_comtrs = sections[sections.duplicated(subset=['CO_MTRS'])].CO_MTRS
+# duplicated_comtrs= sections[sections.CO_MTRS.isin(duplicated_comtrs)]
+# %%
