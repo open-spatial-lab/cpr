@@ -11,3 +11,12 @@ data/pur/pur*
 data/geo/COUNTY_2019*
 data/geo/.DS_Store
 data/.DS_Store
+/data/calpip
+data/.DS_Store
+/data/census_data
+/data/census_geos
+/data/geo
+/data
+!data/pur/2022_meta/*
+data/geo/.DS_Store
+data/.DS_Store
