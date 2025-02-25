@@ -2,3 +2,7 @@ pandas
 pyarrow
 fastparquet
 np
+requests
+bs4
+boto3
+geopandas

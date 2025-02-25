@@ -4,10 +4,11 @@ jobs:
   Update-CalPip-Data:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Install Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'  
+          python-version: '3.12'
         env:
           # add secrets from repo
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
