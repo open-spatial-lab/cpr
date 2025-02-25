@@ -2,9 +2,10 @@ import boto3
 import os
 from constants import BUCKETS, OUTPUT_FILENAMES
 from pathlib import Path
-# load env from ../env
-from dotenv import load_dotenv
-load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / '.env')
+
+# from dotenv import load_dotenv
+# load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / '.env')
+
 CURRENT_DIR = Path(__file__).resolve().parent
 DATA_DIR = CURRENT_DIR.parent / 'data'
 
