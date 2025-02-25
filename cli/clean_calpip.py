@@ -152,7 +152,7 @@ def clean_calpip(
     }
 
 def clean_parquets():
-  calpip_parquets = glob(CALPIP_DIR /  "calpip_20*.parquet")
+  calpip_parquets = glob(str(CALPIP_DIR / "calpip_20*.parquet"))
   for file in calpip_parquets:
     df = pd.read_parquet(file)
     print(file)
