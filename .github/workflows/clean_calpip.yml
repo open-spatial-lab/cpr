@@ -1,5 +1,5 @@
 name: People and Pesticide Explorer - CalPip Data Update
-on: [workflow-dispatch]
+on: [workflow_dispatch]
 jobs:
   Update-CalPip-Data:
     runs-on: ubuntu-latest
