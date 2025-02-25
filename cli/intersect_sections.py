@@ -1,5 +1,8 @@
 # %%
 import geopandas as gpd
+from pathlib import Path
+CURRENT_DIR = Path(__file__).resolve().parent
+DATA_DIR = CURRENT_DIR.parent / 'data'
 cal_albers = 'EPSG:3310'
 min_area = .05
 
@@ -13,6 +16,7 @@ def do_intersection(source, target, source_id, target_id, outpath):
   output_cols = [source_id, target_id, 'AREA_RATIO']
 
   intersected = gpd.overlay(target, source, how='intersection')
+  intersected = intersected.dissolve(by=[source_id, target_id]).reset_index()
   intersected['NEW_AREA'] = intersected.area
   intersected['AREA_RATIO'] = intersected['NEW_AREA'] / intersected['SOURCE_AREA']
   intersected['AREA_RATIO'] = intersected['AREA_RATIO'].round(4)
@@ -33,19 +37,19 @@ def do_intersection(source, target, source_id, target_id, outpath):
 # %%
 formats = [
   {
-    "census_path": '../data/census_geos/ca-zip.parquet',
+    "census_path": DATA_DIR / 'census_geos' / 'ca-zip.parquet',
     "id_col": "ZCTA5CE20",
-    "outpath": '../data/census_geos/crosswalks/zip_intersections.parquet' 
+    "outpath": DATA_DIR / 'census_geos' / 'crosswalks' / 'zip_intersections.parquet' 
   },
   {
     "census_path": "../data/census_geos/ca-tract.parquet",
     "id_col": "GEOID",
-    "outpath": '../data/census_geos/crosswalks/tract_intersections.parquet'
+    "outpath": DATA_DIR / 'census_geos' / 'crosswalks'/'tract_intersections.parquet'
   },
   {
     "census_path": "../data/census_geos/ca-school.parquet",
     "id_col": "FIPS",
-    "outpath": '../data/census_geos/crosswalks/school_district_intersections.parquet'
+    "outpath": DATA_DIR / 'census_geos' / 'crosswalks'/'school_district_intersections.parquet'
   }
 ]
 
@@ -83,4 +87,3 @@ def main():
   )
 if __name__ == "__main__":
   main()
-#%%

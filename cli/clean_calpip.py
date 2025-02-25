@@ -1,23 +1,19 @@
 # %% 
 import pandas as pd
 import geopandas as gpd
-from os import path
 from glob import glob
 import numpy as np
-# remove col limimt df
-pd.set_option('display.max_columns', None)
-pd.set_option('display.float_format', lambda x: '%.3f' % x)
-# %%
-current_dir = path.dirname(__file__)
-calpip_dir = path.join(current_dir, "..", "data", "calpip")
-calpip_files = glob(path.join(calpip_dir, "raw", "*.txt"))
+from pathlib import Path
 
-# %%
-date_cols = [
+CURRENT_DIR = Path(__file__).parent
+CALPIP_DIR = CURRENT_DIR.parent / "data" / "calpip"
+CALPIP_FILES = list(CALPIP_DIR.glob("raw/*.txt"))
+
+DATE_COLS = [
   'DATE',
 ]
-cols_to_keep = [
-  # 'ADJUVANT', 
+COLS_TO_KEEP = [
+  'ADJUVANT', 
   # 'DATE', 
   # 'COUNTY_NAME', 
   'COMTRS', 
@@ -53,10 +49,56 @@ cols_to_keep = [
   # 'UNIT_PLANTED_DESCRIPTION', 
   # 'UNIT_PRODUCT_APPLIED',
   # 'UNIT_TREATED_DESCRIPTION', 
-  # 'USE_NUMBER'
+  'USE_NUMBER'
 ]
-sum_col = [
+SUM_COL = [
   'POUNDS_CHEMICAL_APPLIED'
+]
+
+COLUMN_MAPPING = {
+  "ADVJUVANT": "adjuvant",
+  "DATE": "date",
+  'COMTRS': "comtrs",
+  'POUNDS_CHEMICAL_APPLIED':"lbs_chm_used",
+  'AERIAL_GROUND_INDICATOR': "aerial_ground",
+  # 'AERIAL_GROUND_DESCRIPTION', 
+  'AG_NONAG': "usetype",
+  'AMOUNT_PLANTED': "amount_planted",
+  'CHEMICAL_CODE': "chem_code",
+  'COUNTY_CODE': 'county_cd', 
+  # 'GROWER_ID': "grower_id",
+  # 'LICENSE_NUMBER',
+  # 'OUTLIER', 
+  'POUNDS_PRODUCT_APPLIED': "lbs_prd_used",
+  'PRODUCT_CHEMICAL_PERCENT': "prodchem_pct",
+  'PRODUCT_NUMBER': "prodno",
+  'SITE_CODE': "site_code",
+  "USE_NUMBER": "use_number",
+  # 'SITE_LOCATION_ID', 
+}
+
+NUMERIC_COLS = [
+  'lbs_chm_used',
+  'amount_planted',
+  'lbs_prd_used',
+  'prodchem_pct'
+]
+
+NUMERIC_REPLACEMENTS = [
+  'nan',
+  'MARCH',
+  'ACRES'
+]
+
+STRING_INT_COLS = [
+  'chem_code',
+  'county_cd',
+  'prodno',
+  'site_code',
+]
+
+STRING_INT_REPLACEMENTS = [
+  "GA"
 ]
 
 def clean_calpip(
@@ -94,7 +136,7 @@ def clean_calpip(
         df[col] = df[col].astype(str)
       
     print('str conversion done')
-    df.to_parquet(path.join(calpip_dir, f"calpip_{year}.parquet"))
+    df.to_parquet(CALPIP_DIR / f"calpip_{year}.parquet")
     print('parquet conversion done')
     return {
       "ok": True,
@@ -108,63 +150,17 @@ def clean_calpip(
       "error": e,
       "result": df
     }
-# %%
-column_mapping = {
-  "DATE": "date",
-  'COMTRS': "comtrs",
-  'POUNDS_CHEMICAL_APPLIED':"lbs_chm_used",
-  'AERIAL_GROUND_INDICATOR': "aerial_ground",
-  # 'AERIAL_GROUND_DESCRIPTION', 
-  'AG_NONAG': "usetype",
-  'AMOUNT_PLANTED': "amount_planted",
-  'CHEMICAL_CODE': "chem_code",
-  'COUNTY_CODE': 'county_cd', 
-  # 'GROWER_ID': "grower_id",
-  # 'LICENSE_NUMBER',
-  # 'OUTLIER', 
-  'POUNDS_PRODUCT_APPLIED': "lbs_prd_used",
-  'PRODUCT_CHEMICAL_PERCENT': "prodchem_pct",
-  'PRODUCT_NUMBER': "prodno",
-  'SITE_CODE': "site_code"
-  # 'SITE_LOCATION_ID', 
-}
-
 
 def clean_parquets():
-  calpip_parquets = glob(path.join(calpip_dir,  "calpip_20*.parquet"))
+  calpip_parquets = glob(CALPIP_DIR /  "calpip_20*.parquet")
   for file in calpip_parquets:
     df = pd.read_parquet(file)
     print(file)
-  df = pd.concat([pd.read_parquet(file)[column_mapping.keys()] for file in calpip_parquets])
-  df = df.rename(columns=column_mapping)
+  df = pd.concat([pd.read_parquet(file)[COLUMN_MAPPING.keys()] for file in calpip_parquets])
+  df = df.rename(columns=COLUMN_MAPPING)
   return df
-# %%
 
-numeric_cols = [
-  'lbs_chm_used',
-  'amount_planted',
-  'lbs_prd_used',
-  'prodchem_pct'
-]
-
-numeric_replacements = [
-  'nan',
-  'MARCH',
-  'ACRES'
-]
-
-string_int_cols = [
-  'chem_code',
-  'county_cd',
-  'prodno',
-  'site_code',
-]
-
-string_int_replacements = [
-  "GA"
-]
-
-def clean_columns(df, numeric_cols=numeric_cols, numeric_replacements=numeric_replacements, string_int_cols=string_int_cols, string_int_replacements=string_int_replacements):
+def clean_columns(df, numeric_cols=NUMERIC_COLS, numeric_replacements=NUMERIC_REPLACEMENTS, string_int_cols=STRING_INT_COLS, string_int_replacements=STRING_INT_REPLACEMENTS):
   df = df.copy()
   for col in numeric_cols:
     for rep in numeric_replacements:
@@ -202,7 +198,7 @@ def get_sections():
   # sjoin to
   sections = gpd.sjoin(sections, meridians, predicate='within')
   sections = sections[['CO_MTRS', 'Meridian']]
-# %%
+  return sections
 # %%
 month_dict = {
   "JAN": '01',
@@ -225,33 +221,11 @@ def clean_years(df, month_dict=month_dict):
   df['monthyear'] = df['year'] + '-' + df['month']
   return df
 # %%
-
-group_cols = [
-  'comtrs', 
-  'aerial_ground', 
-  'usetype', 
-  'chem_code', 
-  'county_cd', 
-  'prodchem_pct',
-  'prodno', 
-  'site_code', 
-  'MeridianTownshipRange', 
-  'monthyear' 
-]
-
-def group_data(df, group_cols=group_cols):
-  for col in group_cols:
-    df[col] = df[col].fillna('')
-
-  grouped  = df.groupby(group_cols).sum().reset_index()
-  grouped.to_parquet(path.join(calpip_dir, 'calpip_grouped.parquet'), compression='gzip')
-# %%
 def main():
-
-  for file in calpip_files:
+  for file in CALPIP_FILES:
     print('Cleaning:', file)
     clean_calpip(file)
-  
+
   df = clean_parquets()
   df = clean_columns(df)
   df['TownshipRange'] = df['comtrs'].apply(convert_comtrs)
@@ -259,13 +233,9 @@ def main():
   df = df.merge(sections, left_on='comtrs', right_on='CO_MTRS', how='left')
   df['MeridianTownshipRange'] = df['Meridian'] + ' ' + df['TownshipRange']
   df = clean_years(df)
-
   to_drop = ['date', 'year', 'month', 'TownshipRange', "CO_MTRS", "Meridian"]
-
   df = df.drop(columns=to_drop)
-  df.to_parquet(path.join(calpip_dir, 'calpip_full.parquet'), compression='gzip')
+  df.to_parquet(CALPIP_DIR / 'calpip_full.parquet', compression='gzip')
 
-  group_data(df)
-  
 if __name__ == "__main__":
   main()

@@ -2,7 +2,8 @@
 #### IMPORT DEPS
 import pandas as pd
 from os import path
-
+# pd remove column limit
+pd.set_option('display.max_columns', None)
 current_dir = path.dirname(__file__)
 data_dir = path.join(current_dir, "..", "data")
 
@@ -13,7 +14,15 @@ should_be_numeric = [
 ]
 # %%
 #### IMPORT DATA
-calpip_data = pd.read_parquet(path.join(data_dir, "calpip", "calpip_grouped.parquet"))
+calpip_data = pd.read_parquet(path.join(data_dir, "calpip", "calpip_full.parquet"))
+# Generate unique use_id
+calpip_data['use_id'] = calpip_data['monthyear'] + calpip_data['use_number']
+calpip_data = calpip_data.drop(columns=['use_number'])
+use_numbers = calpip_data[['use_id']].copy().drop_duplicates(subset=['use_id'])
+# convert to int for compression
+use_numbers['use_number'] = use_numbers.index
+calpip_data = calpip_data.merge(use_numbers, on="use_id", how="left")
+calpip_data = calpip_data.drop(columns=['use_id'])
 categories = pd.read_parquet(path.join(data_dir, "meta", "categories.parquet"))
 #### MERGE WITH CATEGORIES AND OUTPUT sections
 calpip_data = calpip_data.merge(categories, left_on="chem_code", right_on="chem_code", how="left")
@@ -26,18 +35,34 @@ crosswalk_cols = [
 ]
 
 default_demog_calculated_cols = [
-      {
+    {
         "name": "median_hh",
         "column": lambda x: x["Median Household Income (In 2021 Inflation Adjusted Dollars)"]
-      },
-      {
+    },
+    {
         "name": "pct_black",
-        "column": lambda x: 0 if x['Total Population'] == 0 else x["Total Population: Not Hispanic or Latino: Black or African American Alone"] / x['Total Population']
-      },
-      {
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["Total Population: Not Hispanic or Latino: Black or African American Alone"] / x['Total Population'], 4)
+    },
+    {
         "name": "pct_hispanic",
-        "column": lambda x: 0 if x['Total Population'] == 0 else x["Total Population: Hispanic or Latino"] / x['Total Population']
-      }
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["Total Population: Hispanic or Latino"] / x['Total Population'], 4)
+    },
+    {
+        "name": "pct_nh_white",
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["Total Population: Not Hispanic or Latino: White Alone"] / x['Total Population'], 4)
+    },
+    {
+        "name": "pct_nh_asian",
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["Total Population: Not Hispanic or Latino: Asian Alone"] / x['Total Population'], 4)
+    },
+    {
+        "name": "pct_american_indian",
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["Total Population: Not Hispanic or Latino: American Indian and Alaska Native Alone"] / x['Total Population'], 4)
+    },
+    {
+        "name": "pct_native_hawaiian_pacific_islander",
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["Total Population: Not Hispanic or Latino: Native Hawaiian and Other Pacific Islander Alone"] / x['Total Population'], 4)
+    }
 ]
 
 xwalk_config = [
@@ -50,6 +75,7 @@ xwalk_config = [
     "demog_id": "FIPS",
     "demog_columns": [*default_demog_calculated_cols],
     "usetype": ['AG'],
+    "drop_cols": ['comtrs', 'AREA_RATIO', 'MeridianTownshipRange', 'prodchem_pct', 'FIPS'],
     "outdir": path.join(data_dir, "output", "calpip-tract.parquet")
   },
   {
@@ -66,13 +92,31 @@ xwalk_config = [
       },
       {
         "name": "pct_black",
-        "column": lambda x: 0 if x['Total Population'] == 0 else x["NH Black or African American Alone"] / x['Total Population']
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["NH Black or African American Alone"] / x['Total Population'], 4)
       },
       {
         "name": "pct_hispanic",
-        "column": lambda x: 0 if x['Total Population'] == 0 else x["Hispanic or Latino"] / x['Total Population']
-      }],
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["Hispanic or Latino"] / x['Total Population'], 4)
+      },
+          {
+        "name": "pct_nh_white",
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["NH White Alone"] / x['Total Population'], 4)
+    },
+    {
+        "name": "pct_nh_asian",
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["NH Asian Alone"] / x['Total Population'], 4)
+    },
+    {
+        "name": "pct_american_indian",
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["NH American Indian and Alaska Native Alone"] / x['Total Population'], 4)
+    },
+    {
+        "name": "pct_native_hawaiian_pacific_islander",
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["NH Native Hawaiian and Other Pacific Islander Alone"] / x['Total Population'], 4)
+    }
+      ],
     "usetype": ['AG'],
+    "drop_cols": ['comtrs', 'AREA_RATIO', 'MeridianTownshipRange', 'prodchem_pct', 'FIPS'],
     "outdir": path.join(data_dir, "output", "calpip-school.parquet")
   },
   {
@@ -84,6 +128,7 @@ xwalk_config = [
     "demog_id": "GEOID",
     "demog_columns": [*default_demog_calculated_cols],
     "usetype": ['AG'],
+    "drop_cols": ['comtrs', 'AREA_RATIO', 'MeridianTownshipRange', 'prodchem_pct'],
     "outdir": path.join(data_dir, "output", "calpip-zip.parquet")
   },
 ]
@@ -105,25 +150,21 @@ for c in xwalk_config:
   for col_config in c["demog_columns"]:
     demog[col_config["name"]] = demog.apply(col_config["column"], axis=1)
   demog = demog[[c["demog_id"], *[x['name'] for x in c['demog_columns']]]]
+  for col in default_demog_calculated_cols[1:]:
+    # use loc not na multiple by 100 and round to int
+    demog.loc[demog[col['name']].notna(), col['name']] = (demog.loc[demog[col['name']].notna(), col['name']] * 100).round(0).astype(int)
 
   joined = crosswalked.merge(demog, left_on=c['crosswalk_id'], right_on=c["demog_id"], how="left")
   
   if c['demog_id'] != c['crosswalk_id']:
-    joined = joined.drop(columns=[c["demog_id"]])
+    joined = joined.drop(columns=[c["demog_id"], *c['drop_cols']])
+
 
   joined.to_parquet(c['outdir'], compression='gzip')
 # %%
 #### DO COUNTY AGG
-default_table_cols = [
-      'aerial_ground', 'usetype', 
-      'chem_code', 'county_cd', 'prodchem_pct',
-      'prodno', 'site_code',  'monthyear',
-      'ai_class','ai_type','health','risk', 'major_category'
-]
-
 county_config = {
     "name": "county",
-    "agg_cols": default_table_cols,
     "drop_cols": ['MeridianTownshipRange', 'comtrs'],
     "demog": path.join(data_dir, "census_data", "ca-county.parquet"),
     "demog_id": "FIPS",
@@ -134,20 +175,36 @@ county_config = {
       },
       {
         "name": "pct_black",
-        "column": lambda x: 0 if x['Total Population'] == 0 else x["NH Black or African American Alone"] / x['Total Population']
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["NH Black or African American Alone"] / x['Total Population'], 4)
       },
       {
         "name": "pct_hispanic",
-        "column": lambda x: 0 if x['Total Population'] == 0 else x["Hispanic or Latino"] / x['Total Population']
-      }],
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["Hispanic or Latino"] / x['Total Population'], 4)
+      },
+          {
+        "name": "pct_nh_white",
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["NH White Alone"] / x['Total Population'], 4)
+    },
+    {
+        "name": "pct_nh_asian",
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["NH Asian Alone"] / x['Total Population'], 4)
+    },
+    {
+        "name": "pct_american_indian",
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["NH American Indian and Alaska Native Alone"] / x['Total Population'], 4)
+    },
+    {
+        "name": "pct_native_hawaiian_pacific_islander",
+        "column": lambda x: 0 if x['Total Population'] == 0 else round(x["NH Native Hawaiian and Other Pacific Islander Alone"] / x['Total Population'], 4)
+    }
+      ],
     "usetype": ['AG', 'NON-AG'],
     "outdir": path.join(data_dir, "output", "calpip-county.parquet")
 }
 
 county_agg = calpip_data.copy()\
   .drop(columns=county_config["drop_cols"])\
-  .fillna('')\
-  .groupby(county_config["agg_cols"]).sum().reset_index()
+  .fillna('')
 
 demog_data = pd.read_parquet(county_config["demog"])
 
@@ -167,23 +224,25 @@ county_agg = county_agg.merge(demog_data[[
 
 for col in should_be_numeric:
   county_agg[col] = pd.to_numeric(county_agg[col], errors='coerce')
+for col in default_demog_calculated_cols[1:]:
+  # use loc not na multiple by 100 and round to int
+  county_agg.loc[county_agg[col['name']].notna(), col['name']] = (county_agg.loc[county_agg[col['name']].notna(), col['name']] * 100).round(0).astype(int)
+    
 county_agg.to_parquet(county_config["outdir"], compression='gzip')
 # %%
 #### DO CA TO CENSUS AGG
 ca_to_census_configs = [
-#   {
-#     "name": "township",
-#     "agg_cols": ["MeridianTownshipRange", *default_table_cols],
-#     "agg_id_col": "MeridianTownshipRange",
-#     "drop_cols": ['comtrs'],
-#     "usetype": ['AG'],
-#     "demog_columns": [*default_demog_calculated_cols],
-#     "outdir": path.join(data_dir, "output", "calpip-township.parquet"),
-#     "xwalk": path.join(data_dir, "census_geos", "crosswalks", "townships-to-tracts.parquet")
-# },
+  {
+    "name": "township",
+    "agg_id_col": "MeridianTownshipRange",
+    "drop_cols": ['comtrs'],
+    "usetype": ['AG'],
+    "demog_columns": [*default_demog_calculated_cols],
+    "outdir": path.join(data_dir, "output", "calpip-township.parquet"),
+    "xwalk": path.join(data_dir, "census_geos", "crosswalks", "townships-to-tracts.parquet")
+},
   {
     "name": "section",
-    "agg_cols": ["MeridianTownshipRange", "comtrs", *default_table_cols],
     "agg_id_col": "comtrs",
     "drop_cols": [],
     "usetype": ['AG', 'NONAG'],
@@ -202,9 +261,8 @@ for config in ca_to_census_configs:
   for col in should_be_numeric:
     agg[col] = pd.to_numeric(agg[col], errors='coerce')
 
-  agg = agg.groupby(config["agg_cols"]).sum().reset_index()
-
   tract_demog = pd.read_parquet(path.join(data_dir, "census_data", "ca-tract.parquet"))
+
   xwalk = pd.read_parquet(config['xwalk'])
 
   if "CO_MTRS" in xwalk.columns:
@@ -216,6 +274,10 @@ for config in ca_to_census_configs:
     'Total Population',
     'Total Population: Hispanic or Latino',
     'Total Population: Not Hispanic or Latino: Black or African American Alone',
+    'Total Population: Not Hispanic or Latino: White Alone',
+    'Total Population: Not Hispanic or Latino: Asian Alone',
+    'Total Population: Not Hispanic or Latino: American Indian and Alaska Native Alone',
+    'Total Population: Not Hispanic or Latino: Native Hawaiian and Other Pacific Islander Alone',
   ]
 
   average_proportion_cols = [
@@ -258,6 +320,10 @@ for config in ca_to_census_configs:
   for col in should_be_numeric:
     agg_merged[col] = pd.to_numeric(agg_merged[col], errors='coerce')
 
+  for col in default_demog_calculated_cols[1:]:
+  # use loc not na multiple by 100 and round to int
+    agg_merged.loc[agg_merged[col['name']].notna(), col['name']] = (agg_merged.loc[agg_merged[col['name']].notna(), col['name']] * 100).round(0).astype(int)
+    
   agg_merged.to_parquet(config["outdir"], compression='gzip')
 # %%
 #### SANITY CHECK

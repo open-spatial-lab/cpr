@@ -1,16 +1,13 @@
 # %%
 import pandas as pd
-from os import path
+from pathlib  import Path
 import os
 
 ONLY_USE_ACTIVE = os.getenv("ONLY_USE_ACTIVE", "true") == "true"
-# remove max cols
-pd.set_option('display.max_columns', None)
-data_dir = "../data"
-pur_meta_dir = path.join(data_dir, "pur", "2022_meta")
+DATA_DIR = Path(__file__).parent.parent / "data"
+pur_meta_dir = DATA_DIR / "pur" / "meta"
 
-
-health_labels = [
+HEALTH_LABELS = [
   {
     "label": "Carcinogen",
     "id": "CARC",
@@ -22,7 +19,7 @@ health_labels = [
     "columns": ["GND_WATER", "GND_WATER_ALL"]
   },
   {
-    "label": "Reproductive",
+    "label": "Reproductive Toxin",
     "id": "REPR",
     "columns": ["REPRODUCTIVE", "REPRODUCTIVE_ALL"]
   },
@@ -30,10 +27,20 @@ health_labels = [
     "label": "Toxic Air Contaminant",
     "id": "TAC",
     "columns": ["TAC", "TAC_ALL"]
+  },
+  {
+    "label": "Cholinesterase Inhibitor",
+    "id": "CHI",
+    "columns": ["CARBAMATE", "CARB_ALL","OP", "OP_ALL"]
+  },
+  {
+    "label": "Restricted Material",
+    "id": "RM",
+    "columns": ["Restricted Material"]
   }
 ]
 
-category_labels = [
+CATEGORY_LABELS = [
   {
     "label": "Organophosphate",
     "id": "OP",
@@ -176,12 +183,12 @@ category_labels = [
     "id": "BIO",
     "columns": ["BIOPESTICIDE", "BIOPESTICIDE_ALL"]
   },
-  {
-    # Bacillus thuringiensis BT
-    "label": "Bacillus Thuringiensis",
-    "id": "BT",
-    "columns": ["BT", "BT_ALL"]
-  },
+  # {
+  #   # Bacillus thuringiensis BT
+  #   "label": "Bacillus Thuringiensis",
+  #   "id": "BT",
+  #   "columns": ["BT", "BT_ALL"]
+  # },
   {
     "label": "Insect Growth Regulator",
     "id": "IGR",
@@ -189,8 +196,7 @@ category_labels = [
   }
 ]
 
-
-pur_meta_files = [
+PUR_META_FILES = [
   {
     "file": "chemical.txt",
     "name": "chemicals",
@@ -200,7 +206,7 @@ pur_meta_files = [
     "rename_cols": {
       "chemname": "chem_name"
     },
-    "outpath": path.join(data_dir, "meta", "chemicals.parquet"),
+    "outpath": DATA_DIR / "meta" / "chemicals.parquet",
     "sort_col": "chem_name",
   },
   {
@@ -208,7 +214,7 @@ pur_meta_files = [
     "name": "sites",
     "calpip_col": "site_code",
     "id_col": "site_code",
-    "outpath": path.join(data_dir, "meta", "sites.parquet"),
+    "outpath": DATA_DIR / "meta" / "sites.parquet",
     "sort_col": "site_name"
   },
   {
@@ -220,62 +226,61 @@ pur_meta_files = [
     "rename_cols": {
       "prodno": "product_code"
     },
-    "outpath": path.join(data_dir, "meta", "products.parquet"),
+    "outpath": DATA_DIR / "meta" / "products.parquet",
     "sort_col": "product_name"
   }
 ]
 
-use_stats_config = [
-  {
-    "data": calpip_data,
-    "id_col": "chem_code",
-    "use_col": "lbs_chm_used",
-    "month_col": "MONTH",
-    "year_col": "YEAR",
-    "monthyear_col": "monthyear",
-    "join_df": read_pur_meta(pur_meta_files[0]),
-    "join_df_id_col": "chem_code",
-    "name": "chemical_use",
-    "drop_cols": ['years_used', 'months_used'],
-    "outpath": pur_meta_files[0]["outpath"]
-  },
-  {
-    "data": calpip_data,
-    "id_col": "site_code",
-    "use_col": "lbs_chm_used",
-    "month_col": "MONTH",
-    "year_col": "YEAR",
-    "monthyear_col": "monthyear",
-    "join_df": read_pur_meta(pur_meta_files[1]),
-    "join_df_id_col": "site_code",
-    "name": "site_use",
-    "drop_cols": ['years_used', 'months_used'],
-    "outpath": pur_meta_files[1]["outpath"]
-  },
-  {
-    "data": calpip_data,
-    "id_col": "prodno",
-    "use_col": "lbs_chm_used",
-    "month_col": "MONTH",
-    "year_col": "YEAR",
-    "monthyear_col": "monthyear",
-    "join_df": read_pur_meta(pur_meta_files[2]),
-    "join_df_id_col": "product_code",
-    "name": "product_use",
-    "drop_cols": ['years_used', 'months_used'],
-    "outpath": pur_meta_files[2]["outpath"]
-  }
-]
+RENAME_DICT = {
+  "CHEM_CODE": "chem_code",
+  "AI_TYPE": "ai_type",
+}
 
+def get_use_stats_config(calpip_data):
+  return [
+    {
+      "data": calpip_data,
+      "id_col": "chem_code",
+      "use_col": "lbs_chm_used",
+      "month_col": "MONTH",
+      "year_col": "YEAR",
+      "monthyear_col": "monthyear",
+      "join_df": read_pur_meta(PUR_META_FILES[0], calpip_data),
+      "join_df_id_col": "chem_code",
+      "name": "chemical_use",
+      "drop_cols": ['years_used', 'months_used'],
+      "outpath": PUR_META_FILES[0]["outpath"]
+    },
+    {
+      "data": calpip_data,
+      "id_col": "site_code",
+      "use_col": "lbs_chm_used",
+      "month_col": "MONTH",
+      "year_col": "YEAR",
+      "monthyear_col": "monthyear",
+      "join_df": read_pur_meta(PUR_META_FILES[1], calpip_data),
+      "join_df_id_col": "site_code",
+      "name": "site_use",
+      "drop_cols": ['years_used', 'months_used'],
+      "outpath": PUR_META_FILES[1]["outpath"]
+    },
+    {
+      "data": calpip_data,
+      "id_col": "prodno",
+      "use_col": "lbs_chm_used",
+      "month_col": "MONTH",
+      "year_col": "YEAR",
+      "monthyear_col": "monthyear",
+      "join_df": read_pur_meta(PUR_META_FILES[2], calpip_data),
+      "join_df_id_col": "product_code",
+      "name": "product_use",
+      "drop_cols": ['years_used', 'months_used'],
+      "outpath": PUR_META_FILES[2]["outpath"]
+    }
+  ]
 
-# %%
-calpip_data = pd.read_parquet(path.join(data_dir, "calpip", "calpip_grouped.parquet"))
-calpip_data['YEAR'] = calpip_data['monthyear'].str.slice(0, 4)
-calpip_data['MONTH'] = calpip_data['monthyear'].str.slice(4, 6)
-
-
-def read_pur_meta(config):
-  df = pd.read_csv(path.join(pur_meta_dir, config['file']), encoding='latin1')
+def read_pur_meta(config, calpip_data):
+  df = pd.read_csv(pur_meta_dir / config['file'], encoding='latin1')
   df[config['id_col']] = df[config['id_col']].astype(str)
   if ONLY_USE_ACTIVE:
     valid_ids = calpip_data[config['calpip_col']].unique()
@@ -289,6 +294,9 @@ def read_pur_meta(config):
   if 'sort_col' in config:
     df = df.sort_values(by=[config['sort_col']])
   return df
+
+def condense_to_row_id(df, col) -> pd.DataFrame:
+  return df[col].drop_duplicates().reset_index().rename(columns={"index": f"{col}_ID"})
 
 def get_use_stats(data, id_col, use_col, month_col, year_col, monthyear_col, join_df, join_df_id_col, **kwargs):
   df = data[[id_col, use_col, month_col, year_col, monthyear_col]].copy()
@@ -337,40 +345,6 @@ def get_use_stats(data, id_col, use_col, month_col, year_col, monthyear_col, joi
     right_on=id_col
   )
 
-
-for config in use_stats_config:
-  df = get_use_stats(**config)
-  id_col = config['id_col']
-  df[id_col] = df[id_col].astype(str)
-  df = df.drop(columns=config['drop_cols'])
-  df.to_parquet(config['outpath'])
-
-# %%
-categories_data = pd.read_excel(path.join(data_dir, "pur", '2022_meta', "AI Cat Data.xlsx"))
-categories_data['CHEM_CODE'] = categories_data['CHEM_CODE'].astype(str)
-
-rename_dict = {
-  "CHEM_CODE": "chem_code",
-  "AI_CLASS": "ai_class",
-  "AI_TYPE": "ai_type",
-  "RISK": "risk",
-}
-
-categories_data = categories_data.rename(columns=rename_dict)
-
-if ONLY_USE_ACTIVE:
-  active_chems = calpip_data['chem_code'].unique()
-  categories_data = categories_data[categories_data['chem_code'].isin(active_chems)]
-
-def condense_to_row_id(df, col) -> pd.DataFrame:
-
-  return df[col].drop_duplicates().reset_index().rename(columns={"index": f"{col}_ID"})
-
-class_codes = condense_to_row_id(categories_data, "ai_class")
-type_codes = condense_to_row_id(categories_data, "ai_type")
-
-# health
-
 def apply_label(labels):
   def inner_apply_label(row):
     value = ''
@@ -391,43 +365,74 @@ def apply_count(id):
     return 0
   return inner_apply_count
 
-categories_data['health_ID'] = categories_data.apply(apply_label(health_labels), axis=1)
-categories_data['health_count'] = categories_data.apply(apply_count("health_ID"), axis=1)
-categories_data["major_category_ID"] = categories_data.apply(apply_label(category_labels), axis=1)
-categories_data['major_category_count'] = categories_data.apply(apply_count("major_category_ID"), axis=1)
+def main():
+  calpip_data = pd.read_parquet(DATA_DIR / "calpip" / "calpip_full.parquet")
+  calpip_data['YEAR'] = calpip_data['monthyear'].str.slice(0, 4)
+  calpip_data['MONTH'] = calpip_data['monthyear'].str.slice(4, 6)
+  use_stats_config = get_use_stats_config(calpip_data)
+  for config in use_stats_config:
+    df = get_use_stats(**config)
+    id_col = config['id_col']
+    df[id_col] = df[id_col].astype(str)
+    df = df.drop(columns=config['drop_cols'])
+    df.to_parquet(config['outpath'])
 
-categories_data = categories_data.merge(class_codes, left_on="ai_class", right_on="ai_class")
-categories_data = categories_data.merge(type_codes, left_on="ai_type", right_on="ai_type")
+  categories_data = pd.read_excel(pur_meta_dir / "AI Cat Data.xlsx")
+  categories_data['CHEM_CODE'] = categories_data['CHEM_CODE'].astype(str)
+  restricted_materials_data = pd.read_excel(pur_meta_dir / "Restricted Pesticides.xlsx").iloc[1:]
+  restricted_materials_data.columns = ['name', 'DPR chem code', 'Restricted Material', '_']
+  restricted_materials_data = restricted_materials_data[['DPR chem code', 'Restricted Material']]
 
-health_labels = pd.DataFrame([{"label": l['label'], "id": l['id']} for l in health_labels])
-major_category_labels = pd.DataFrame([{"label": l['label'], "id": l['id']} for l in category_labels])
+  restricted_materials_data['Restricted Material'] = 'Y'
+  restricted_materials_data['DPR chem code'] = pd.to_numeric(restricted_materials_data['DPR chem code'], errors='coerce')
+  restricted_materials_data = restricted_materials_data.dropna(subset=['DPR chem code'])
 
-raw_out_cols = [
-  'chem_code',
-  'ai_class_ID',
-  'ai_type_ID',
-  'health_ID',
-  "major_category_ID",
-  'risk'
-]
+  restricted_materials_data['DPR chem code'] = restricted_materials_data['DPR chem code'].astype(int).astype(str)
+  categories_data = categories_data.merge(restricted_materials_data, left_on="CHEM_CODE", right_on="DPR chem code", how="left")
+  categories_data = categories_data.rename(columns=RENAME_DICT)
 
-out_cols = [col.replace("_ID", "") for col in raw_out_cols]
+  if ONLY_USE_ACTIVE:
+    active_chems = calpip_data['chem_code'].unique()
+    categories_data = categories_data[categories_data['chem_code'].isin(active_chems)]
 
-categories_min = categories_data[raw_out_cols].copy()
+  categories_no_adj = categories_data[categories_data.ai_type != 'ADJUVANT']
+  use_type_codes = condense_to_row_id(categories_no_adj, "ai_type")
+  # health
 
-for col in raw_out_cols:
-  categories_min[col] = categories_min[col].astype(str)
 
-categories_min.columns = out_cols
-# OUTPUT
-categories_min.to_parquet(path.join(data_dir, "meta", "categories.parquet"))
-# title case
-class_codes['ai_class'] = class_codes['ai_class'].astype(str).str.title()
-class_codes.to_parquet(path.join(data_dir, "meta", "class_codes.parquet"))
-type_codes['ai_type'] = type_codes['ai_type'].astype(str).str.title()
-type_codes.to_parquet(path.join(data_dir, "meta", "type_codes.parquet"))
-health_labels.to_parquet(path.join(data_dir, "meta", "health_labels.parquet"))
-major_category_labels.to_parquet(path.join(data_dir, "meta", "major_category_labels.parquet"))
-pd.DataFrame(['HIGH', 'LOW', 'OTHER']).rename(columns={0: "RISK"})\
-  .to_parquet(path.join(data_dir, "meta", "risk_codes.parquet"))
+  categories_data['health_ID'] = categories_data.apply(apply_label(HEALTH_LABELS), axis=1)
+  categories_data['health_count'] = categories_data.apply(apply_count("health_ID"), axis=1)
+  categories_data["major_category_ID"] = categories_data.apply(apply_label(CATEGORY_LABELS), axis=1)
+  categories_data['major_category_count'] = categories_data.apply(apply_count("major_category_ID"), axis=1)
+
+  categories_data = categories_data.merge(use_type_codes, left_on="ai_type", right_on="ai_type")
+
+  health_labels_output = pd.DataFrame([{"label": l['label'], "id": l['id']} for l in HEALTH_LABELS])
+  chemical_class_labels = pd.DataFrame([{"label": l['label'], "id": l['id']} for l in CATEGORY_LABELS])
+
+  raw_out_cols = [
+    'chem_code',
+    "major_category_ID",
+    'ai_type_ID',
+    'health_ID',
+  ]
+
+  out_cols = [col.replace("_ID", "") for col in raw_out_cols]
+
+  categories_min = categories_data[raw_out_cols].copy()
+
+  for col in raw_out_cols:
+    categories_min[col] = categories_min[col].astype(str)
+
+  categories_min.columns = out_cols
+
+  # OUTPUT
+  categories_min.drop_duplicates().to_parquet(DATA_DIR / "meta" / "categories.parquet")
+  use_type_codes['ai_type'] = use_type_codes['ai_type'].astype(str).str.title()
+  use_type_codes.drop_duplicates().to_parquet(DATA_DIR / "meta" / "use_type_codes.parquet")
+  health_labels_output.drop_duplicates().to_parquet(DATA_DIR / "meta" / "health_labels.parquet")
+  chemical_class_labels.drop_duplicates().to_parquet(DATA_DIR / "meta" / "chemical_class_labels.parquet")
+# %%
+if __name__ == "__main__":
+  main()
 # %%
