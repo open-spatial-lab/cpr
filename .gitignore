@@ -7,3 +7,6 @@ data/geo/COUNTY_2019*
 /data
 !data/pur/2022_meta/*
 */**/.DS_Store
+.env
+_data
+__pycache__

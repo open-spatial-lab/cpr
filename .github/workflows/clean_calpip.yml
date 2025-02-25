@@ -1,0 +1,30 @@
+name: People and Pesticide Explorer - CalPip Data Update
+on: [workflow_dispatch]
+jobs:
+  Update-CalPip-Data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'  
+        env:
+          # add secrets from repo
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+      - name: Download CalPIP Data
+        run: python cli download_calpip
+      - name: Clean CalPIP Data
+        run: python cli clean_calpip
+      - name: Upload Clean CalPIP Data
+        run: python cli upload_clean_calpip_data
+      - name: Parse Meta
+        run: python cli parse_meta
+      - name: Join Census Units
+        run: python cli join_census_units
+      - name: Upload Final Outputs
+        run: python cli upload_final_outputs

@@ -1,0 +1,9 @@
+services:
+  app:
+    build:
+      context: .
+    container_name: pesticide-analysis-cli
+    volumes:
+      - ./cli:/app/cli
+      - ./data:/app/data
+    entrypoint: ["python", "cli"]
