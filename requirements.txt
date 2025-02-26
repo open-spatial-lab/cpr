@@ -6,3 +6,4 @@ requests
 bs4
 boto3
 geopandas
+dotenv
