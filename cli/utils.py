@@ -3,11 +3,12 @@ import os
 from constants import BUCKETS, OUTPUT_FILENAMES
 from pathlib import Path
 
-# from dotenv import load_dotenv
-# load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / '.env')
-
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / '.env')
+ 
 CURRENT_DIR = Path(__file__).resolve().parent
-DATA_DIR = CURRENT_DIR.parent / 'data'
+BASE_DIR = CURRENT_DIR.parent
+DATA_DIR = BASE_DIR / 'data'
 
 class DataDownloader:
     def __init__(self, bucket):
@@ -57,15 +58,15 @@ def download_calpip_update_data():
     folders_to_download = [
         {
             's3folderpath': 'calpip/',
-            'outputfolderpath': DATA_DIR / 'calpip'
+            'outputfolderpath': DATA_DIR
         },
         {
             's3folderpath': 'census_data/',
-            'outputfolderpath': DATA_DIR / 'census_data'
+            'outputfolderpath': DATA_DIR
         },
         {
             's3folderpath': 'census_geos/crosswalks',
-            'outputfolderpath': DATA_DIR / 'census_geos' / 'crosswalks'
+            'outputfolderpath': DATA_DIR
         },
         {
             's3folderpath': 'pur/',
@@ -94,13 +95,22 @@ def download_calpip_update_data():
         s3.download_file(**file)
 
 def upload_clean_calpip_data():
-    s3 = DataDownloader(BUCKETS['raw'])
-    existing_files = [row['Key'].split("/")[-1]  for row in s3.list_objects_v2(Bucket=BUCKETS['raw'], Prefix="calpip/")['Contents']]
+    bucketManager = DataDownloader(BUCKETS['raw'])
+    with open(BASE_DIR / f"files_to_remove.txt", 'r') as f:
+        files_to_remove = f.readlines()
+    for file in files_to_remove:
+        try:
+            bucketManager.s3.delete_object(Bucket=BUCKETS['raw'], Key=file.strip())
+        except Exception as e:
+            print(f"Error deleting {file}: {e}")
+
+    existing_files = [row['Key'].split("/")[-1]  for row in bucketManager.s3.list_objects_v2(Bucket=BUCKETS['raw'], Prefix="calpip/")['Contents']]
     # for file in os.listdir(DATA_DIR / 'calpip') if not in bucket / calpip, upload
-    for file in os.listdir(DATA_DIR / 'calpip'):
+    parquet_files = [file for file in os.listdir(DATA_DIR / 'calpip') if file.endswith('.parquet')]
+    for file in parquet_files:
         if file not in existing_files or file == 'calpip_full.parquet':
             print(f"Uploading {file}")
-            s3.upload_file(f"calpip/{file}", DATA_DIR / 'calpip' / file)
+            bucketManager.upload_file(f"calpip/{file}", DATA_DIR / 'calpip' / file)
 
 def upload_final_outputs():
     s3 = DataDownloader(BUCKETS['output'])

@@ -10,3 +10,4 @@ data/geo/COUNTY_2019*
 .env
 _data
 __pycache__
+files_to_remove.txt

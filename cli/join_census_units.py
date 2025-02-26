@@ -195,31 +195,31 @@ def do_sanity_checks(calpip_data):
     print_check(total_lbs_prd_ag, df[df['usetype'] == 'AG'][['use_index', 'lbs_prd_used']].drop_duplicates()['lbs_prd_used'].sum(), f'{title} :: prd ag')
     return df
   section = sanity_check(
-    pd.read_parquet(path.join(DATA_DIR, "output", "calpip-sections.parquet")),
+    pd.read_parquet(DATA_DIR / "output" / "calpip-sections.parquet"),
     "Sections"
   )
   school = sanity_check(
-    pd.read_parquet(path.join(DATA_DIR, "output", "calpip-school.parquet")),
+    pd.read_parquet(DATA_DIR / "output" / "calpip-school.parquet"),
     "Schools",
     True
   )
   zcta = sanity_check(
-    pd.read_parquet(path.join(DATA_DIR, "output", "calpip-zip.parquet")),
+    pd.read_parquet(DATA_DIR / "output" / "calpip-zip.parquet"),
     "Zip",
     True
   )
   township = sanity_check(
-    pd.read_parquet(path.join(DATA_DIR, "output", "calpip-township.parquet")),
+    pd.read_parquet(DATA_DIR / "output" / "calpip-township.parquet"),
     "Township",
     True
   )
   county = sanity_check(
-    pd.read_parquet(path.join(DATA_DIR, "output", "calpip-county.parquet")),
+    pd.read_parquet(DATA_DIR / "output" / "calpip-county.parquet"),
     "County"
   )
 
   tract = sanity_check(
-    pd.read_parquet(path.join(DATA_DIR, "output", "calpip-tract.parquet")),
+    pd.read_parquet(DATA_DIR / "output" / "calpip-tract.parquet"),
     "Tract",
     True
   )
@@ -230,7 +230,7 @@ def main():
 
   calpip_data = get_calpip_full()
   sections = minify_use_ids(calpip_data)
-  sections.to_parquet(path.join(DATA_DIR, "output", "calpip-sections.parquet"), compression='gzip')
+  sections.to_parquet(DATA_DIR / "output" / "calpip-sections.parquet", compression='gzip')
   print("Minified calpip data - doing joins.")
   do_census_joins(calpip_data)
   print("Done with census joins.")

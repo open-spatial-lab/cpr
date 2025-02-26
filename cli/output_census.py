@@ -2,9 +2,9 @@
 import pandas as pd
 from os import path
 import geopandas as gpd
-
-current_dir = path.dirname(__file__)
-data_dir = path.join(current_dir, "..", "data")
+from pathlib import Path
+CURRENT_DIR = Path(__file__).resolve().parent
+DATA_DIR = CURRENT_DIR.parent / 'data'
 # remove col display limit
 pd.set_option('display.max_columns', None)
 # %%
@@ -62,9 +62,9 @@ def do_standard_transformation(df, id_col="FIPS", also_keep=[]):
 # %%
 def do_tract():
   tract_demog = do_standard_transformation(
-    pd.read_parquet(path.join(data_dir, "census_data", "ca-tract.parquet"))
+    pd.read_parquet(DATA_DIR / "census_data" / "ca-tract.parquet")
   )
-  tract_geo = pd.read_parquet(path.join(data_dir, "census_geos", "ca-tract.parquet"))[[
+  tract_geo = pd.read_parquet(DATA_DIR / "census_geos" / "ca-tract.parquet")[[
     "GEOID",
     "NAMELSAD",
     "NAMELSADCO",
@@ -74,7 +74,7 @@ def do_tract():
   merged = tract_geo.merge(tract_demog, left_on="GEOID", right_on="FIPS")
   merged["Area Name"] = merged["NAMELSAD"] + " " + merged["NAMELSADCO"]
   merged = merged.drop(columns=["NAMELSAD", "NAMELSADCO"]).drop_duplicates()
-  merged.to_parquet(path.join(data_dir, "output", "ca-tract-demography.parquet"))
+  merged.to_parquet(DATA_DIR / "output" / "ca-tract-demography.parquet")
 # %%
 standard_rename_dict = {
     "NH Black or African American Alone": "Total Population: Not Hispanic or Latino: Black or African American Alone",
@@ -89,7 +89,7 @@ standard_rename_dict = {
     "NH Native Hawaiian and Other Pacific Islander Alone": "Total Population: Not Hispanic or Latino: Native Hawaiian and Other Pacific Islander Alone",
   }
 def do_county():
-  county_df = pd.read_parquet(path.join(data_dir, "census_data", "ca-county.parquet"))
+  county_df = pd.read_parquet(DATA_DIR / "census_data" / "ca-county.parquet")
   county_df = county_df.rename(columns=standard_rename_dict)
   county = do_standard_transformation(
     county_df,
@@ -99,7 +99,7 @@ def do_county():
   county = county.sort_values("Area Name")
   # row number as id
   county['county_cd'] = county.index.astype(int)
-  county_geo = pd.read_parquet(path.join(data_dir, "census_geos", "cal_counties.parquet"))[[
+  county_geo = pd.read_parquet(DATA_DIR / "census_geos" / "cal_counties.parquet")[[
     "county_cd",
     "NAME",
     "ALAND",
@@ -110,10 +110,10 @@ def do_county():
     .drop(columns=["county_cd", "NAME"])
   merged["ALAND"] = merged['ALAND'].astype(int)
   merged["AWATER"] = merged['AWATER'].astype(int)
-  merged.drop_duplicates().to_parquet(path.join(data_dir, "output", "ca-county-demography.parquet"))
+  merged.drop_duplicates().to_parquet(DATA_DIR / "output" / "ca-county-demography.parquet")
 # %%
 def do_schools():
-  schools = pd.read_parquet(path.join(data_dir, "census_data", "ca-school.parquet"))
+  schools = pd.read_parquet(DATA_DIR / "census_data" / "ca-school.parquet")
   schools = schools.rename(columns=standard_rename_dict)
 
   schools = do_standard_transformation(
@@ -124,22 +124,22 @@ def do_schools():
 
   schools = schools.sort_values("Area Name")
 
-  schools_geo = pd.read_parquet(path.join(data_dir, "census_geos", "ca-school.parquet"))[[
+  schools_geo = pd.read_parquet(DATA_DIR / "census_geos" / "ca-school.parquet")[[
     "FIPS",
     "ALAND",
     "AWATER"
   ]]
   merged = schools.merge(schools_geo, left_on="FIPS", right_on="FIPS")
-  merged.drop_duplicates().to_parquet(path.join(data_dir, "output", "ca-school-demography.parquet"))
+  merged.drop_duplicates().to_parquet(DATA_DIR / "output" / "ca-school-demography.parquet")
 # %%
 def do_zips():
-  zctas = pd.read_parquet(path.join(data_dir, "census_data", "ca-zip.parquet"))
+  zctas = pd.read_parquet(DATA_DIR / "census_data" / "ca-zip.parquet")
   zctas = do_standard_transformation(
     zctas,
     id_col="GEOID",
     also_keep=[]
   )
-  zcta_geo = pd.read_parquet(path.join(data_dir, "census_geos", "ca-zip.parquet"))[[
+  zcta_geo = pd.read_parquet(DATA_DIR / "census_geos" / "ca-zip.parquet")[[
     "ZCTA5CE20",
     "ALAND20",
     'AWATER20'
@@ -149,7 +149,7 @@ def do_zips():
     "AWATER20": "AWATER"
   })
   merged = zctas.merge(zcta_geo, left_on="GEOID", right_on="GEOID")
-  merged.drop_duplicates().to_parquet(path.join(data_dir, "output", "ca-zip-demography.parquet"))
+  merged.drop_duplicates().to_parquet(DATA_DIR / "output" / "ca-zip-demography.parquet")
 # %%
 sum_proportion_cols = [
   'Total Population',
@@ -170,13 +170,13 @@ average_proportion_cols = [
 ]
 
 def do_sections():
-  sections_geo = gpd.read_parquet(path.join(data_dir, "sections", "sections.parquet"))\
+  sections_geo = gpd.read_parquet(DATA_DIR / "sections" / "sections.parquet")\
     .to_crs("EPSG:3310")
   sections_geo['SECTION_AREA'] = sections_geo['geometry'].area
   sections_geo = pd.DataFrame(sections_geo[['CO_MTRS', 'SECTION_AREA']])
-  sections_xwalk = pd.read_parquet(path.join(data_dir, "census_geos", "crosswalks", "sections-to-tracts.parquet"))
+  sections_xwalk = pd.read_parquet(DATA_DIR / "census_geos", "crosswalks" / "sections-to-tracts.parquet")
   sections_geo = sections_geo.rename(columns={"CO_MTRS": "comtrs"})
-  tract_demog = pd.read_parquet(path.join(data_dir, "census_data", "ca-tract.parquet"))
+  tract_demog = pd.read_parquet(DATA_DIR / "census_data" / "ca-tract.parquet")
 
   merged = sections_geo.merge(sections_xwalk, left_on="comtrs", right_on="CO_MTRS")\
     .merge(tract_demog, left_on="GEOID", right_on="FIPS", how="left")
@@ -207,7 +207,7 @@ def do_sections():
   merged = sections_geo.merge(merged, left_on="comtrs", right_on="comtrs")
   
   merged = merged.rename(columns={"SECTION_AREA": "ALAND"})
-  merged.to_parquet(path.join(data_dir, "output", "ca-section-demography.parquet"))
+  merged.to_parquet(DATA_DIR / "output" / "ca-section-demography.parquet")
 # %%
 def do_townships():
   townships = gpd.read_file('../data/geo/CA-townships-2023.geojson')\
@@ -218,8 +218,8 @@ def do_townships():
   townships['TOWNSHIP_AREA'] = townships['geometry'].area
   townships = pd.DataFrame(townships[['MeridianTownshipRange', 'TOWNSHIP_AREA']])
 
-  township_xwalk = pd.read_parquet(path.join(data_dir, "census_geos", "crosswalks", "townships-to-tracts.parquet"))
-  tract_demog = pd.read_parquet(path.join(data_dir, "census_data", "ca-tract.parquet"))
+  township_xwalk = pd.read_parquet(DATA_DIR / "census_geos" / "crosswalks" / "townships-to-tracts.parquet")
+  tract_demog = pd.read_parquet(DATA_DIR / "census_data" / "ca-tract.parquet")
 
   merged = townships.merge(township_xwalk, left_on="MeridianTownshipRange", right_on="MeridianTownshipRange")\
     .merge(tract_demog, left_on="GEOID", right_on="FIPS", how="left")
@@ -250,7 +250,7 @@ def do_townships():
 
   merged = townships.merge(merged, left_on="MeridianTownshipRange", right_on="MeridianTownshipRange")
   merged = merged.rename(columns={"TOWNSHIP_AREA": "ALAND"})
-  merged.to_parquet(path.join(data_dir, "output", "ca-township-demography.parquet"))
+  merged.to_parquet(DATA_DIR / "output" / "ca-township-demography.parquet")
 # %%
 def main():
   do_tract()
@@ -279,30 +279,30 @@ def get_diffs(pops1, pops2):
 # %%
 if __name__ == "__main__":
   main()
-  tract = pd.read_parquet(path.join(data_dir, "output", "ca-tract-demography.parquet"))
+  tract = pd.read_parquet(DATA_DIR / "output" / "ca-tract-demography.parquet")
   tract_pops = get_pops(tract)
 
-  county = pd.read_parquet(path.join(data_dir, "output", "ca-county-demography.parquet"))
+  county = pd.read_parquet(DATA_DIR / "output" / "ca-county-demography.parquet")
   county_pops = get_pops(county)
   county_diff = get_diffs(tract_pops, county_pops)
   print('\n!!!COUNTY\n', county_diff)
 
-  school = pd.read_parquet(path.join(data_dir, "output", "ca-school-demography.parquet"))
+  school = pd.read_parquet(DATA_DIR / "output" / "ca-school-demography.parquet")
   school_pops = get_pops(school)
   school_diff = get_diffs(tract_pops, school_pops)
   print('\n!!!SCHOOL\n', school_diff)
 
-  zctas = pd.read_parquet(path.join(data_dir, "output", "ca-zip-demography.parquet")).drop_duplicates()
+  zctas = pd.read_parquet(DATA_DIR / "output" / "ca-zip-demography.parquet").drop_duplicates()
   zcta_pops = get_pops(zctas)
   zcta_diff = get_diffs(tract_pops, zcta_pops)
   print('\n!!!ZCTAS\n', zcta_diff)
 
-  sections = pd.read_parquet(path.join(data_dir, "output", "ca-section-demography.parquet"))
+  sections = pd.read_parquet(DATA_DIR / "output" / "ca-section-demography.parquet")
   sections_pops = get_pops(sections)
   sections_diff = get_diffs(tract_pops, sections_pops)
   print('\n!!!SECTIONS\n', sections_diff)
 
-  townships = pd.read_parquet(path.join(data_dir, "output", "ca-township-demography.parquet"))
+  townships = pd.read_parquet(DATA_DIR / "output" / "ca-township-demography.parquet")
   township_pops = get_pops(townships)
   township_diff = get_diffs(tract_pops, township_pops)
   print('\n!!!TOWNSHIPS\n', township_diff)

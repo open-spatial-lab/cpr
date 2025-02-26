@@ -14,7 +14,7 @@ script_dict = {
   "download_sections": download_sections.main,
   "clean_calpip": clean_calpip.main,
   "intersect_sections": intersect_sections.main,
-  "output_census_units": join_census_units.main,
+  "join_census_units": join_census_units.main,
   "output_census": output_census.main,
   "parse_meta": parse_meta.main,
   "upload_final_outputs": utils.upload_final_outputs,

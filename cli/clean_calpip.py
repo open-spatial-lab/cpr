@@ -4,10 +4,11 @@ import geopandas as gpd
 from glob import glob
 import numpy as np
 from pathlib import Path
-
-CURRENT_DIR = Path(__file__).parent
-CALPIP_DIR = CURRENT_DIR.parent / "data" / "calpip"
-CALPIP_FILES = list(CALPIP_DIR.glob("raw/*.txt"))
+import zipfile
+BASE_DIR = Path(__file__).parent.parent
+DATA_DIR = BASE_DIR / "data"
+CALPIP_DIR = DATA_DIR / "calpip"
+CALPIP_FILES = glob(str(CALPIP_DIR / "*.zip"))
 
 DATE_COLS = [
   'DATE',
@@ -56,7 +57,7 @@ SUM_COL = [
 ]
 
 COLUMN_MAPPING = {
-  "ADVJUVANT": "adjuvant",
+  "ADJUVANT": "adjuvant",
   "DATE": "date",
   'COMTRS': "comtrs",
   'POUNDS_CHEMICAL_APPLIED':"lbs_chm_used",
@@ -107,9 +108,14 @@ def clean_calpip(
     date_format_out='%Y-%m',
     df=None
   ):
+  # unzip filepath
+  with zipfile.ZipFile(filepath, 'r') as zip_ref:
+      zip_ref.extractall(filepath.replace('.zip', ''))
   try: 
     if df is None:
-      df = pd.read_csv(filepath, sep="\t")
+      filename = filepath.split('/')[-1].replace('.zip', '')
+      txtpath = filepath.replace('.zip', f'/{filename}.txt')
+      df = pd.read_csv(txtpath, sep="\t")
     else:
       df = df.copy()
     print('file read')
@@ -138,6 +144,8 @@ def clean_calpip(
     print('str conversion done')
     df.to_parquet(CALPIP_DIR / f"calpip_{year}.parquet")
     print('parquet conversion done')
+    with open(BASE_DIR / f"files_to_remove.txt", 'a') as f:
+      f.write(f"calpip/{filename}.zip\n")
     return {
       "ok": True,
       "result": df
@@ -153,10 +161,11 @@ def clean_calpip(
 
 def clean_parquets():
   calpip_parquets = glob(str(CALPIP_DIR / "calpip_20*.parquet"))
+  dfs = []
   for file in calpip_parquets:
-    df = pd.read_parquet(file)
     print(file)
-  df = pd.concat([pd.read_parquet(file)[COLUMN_MAPPING.keys()] for file in calpip_parquets])
+    dfs.append(pd.read_parquet(file)[COLUMN_MAPPING.keys()])
+  df = pd.concat(dfs)
   df = df.rename(columns=COLUMN_MAPPING)
   return df
 
@@ -174,7 +183,7 @@ def clean_columns(df, numeric_cols=NUMERIC_COLS, numeric_replacements=NUMERIC_RE
     df[col] = df[col].fillna(0).astype(int).astype(str).fillna('')
 
   return df
-# %%
+
 def convert_comtrs(comtrs):
     if len(comtrs) < 9:
       return None
@@ -186,12 +195,12 @@ def convert_comtrs(comtrs):
 
 # %%
 def get_sections():
-  townships = gpd.read_file('../data/geo/PLSS Township Range California.geojson')
+  townships = gpd.read_file(DATA_DIR / 'geo'/ 'PLSS Township Range California.geojson')
   meridians = townships.dissolve(by='Meridian').reset_index()
   meridians = meridians[['Meridian', 'geometry']]
   meridians = meridians.to_crs("EPSG:3310")
 
-  sections = gpd.read_parquet('../data/sections/sections.parquet')
+  sections = gpd.read_parquet(DATA_DIR / 'sections'/ 'sections.parquet')
   sections = sections.to_crs("EPSG:3310")
   sections['centroid'] = sections.centroid
   sections = sections.set_geometry('centroid')
@@ -229,11 +238,14 @@ def main():
   df = clean_parquets()
   df = clean_columns(df)
   df['TownshipRange'] = df['comtrs'].apply(convert_comtrs)
+  
   sections = get_sections()
   df = df.merge(sections, left_on='comtrs', right_on='CO_MTRS', how='left')
   df['MeridianTownshipRange'] = df['Meridian'] + ' ' + df['TownshipRange']
+  
   df = clean_years(df)
   to_drop = ['date', 'year', 'month', 'TownshipRange', "CO_MTRS", "Meridian"]
+  
   df = df.drop(columns=to_drop)
   df.to_parquet(CALPIP_DIR / 'calpip_full.parquet', compression='gzip')
 

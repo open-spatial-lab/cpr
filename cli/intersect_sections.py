@@ -42,12 +42,12 @@ formats = [
     "outpath": DATA_DIR / 'census_geos' / 'crosswalks' / 'zip_intersections.parquet' 
   },
   {
-    "census_path": "../data/census_geos/ca-tract.parquet",
+    "census_path": DATA_DIR / "census_geos" / "ca-tract.parquet",
     "id_col": "GEOID",
     "outpath": DATA_DIR / 'census_geos' / 'crosswalks'/'tract_intersections.parquet'
   },
   {
-    "census_path": "../data/census_geos/ca-school.parquet",
+    "census_path": DATA_DIR / "census_geos" / "ca-school.parquet",
     "id_col": "FIPS",
     "outpath": DATA_DIR / 'census_geos' / 'crosswalks'/'school_district_intersections.parquet'
   }
@@ -55,23 +55,23 @@ formats = [
 
 # %%
 def main():
-  sections = gpd.read_parquet('../data/sections/sections.parquet')
+  sections = gpd.read_parquet(DATA_DIR /'sections' / 'sections.parquet')
   sections = sections.to_crs(cal_albers)
 
   for format in formats:
     census_geo = gpd.read_parquet(format['census_path'])
     intersected = do_intersection(sections, census_geo, "CO_MTRS", format['id_col'], format['outpath'])
 
-  tracts = gpd.read_parquet('../data/census_geos/ca-tract.parquet')
+  tracts = gpd.read_parquet(DATA_DIR / 'census_geos' / 'ca-tract.parquet')
 
   do_intersection(
     tracts, 
     sections,
     'GEOID',
     "CO_MTRS",
-    '../data/census_geos/crosswalks/sections-to-tracts.parquet', 
+    DATA_DIR / 'census_geos' / 'crosswalks' / 'sections-to-tracts.parquet', 
   )
-  townships = gpd.read_file('../data/geo/CA-townships-2023.geojson')
+  townships = gpd.read_file(DATA_DIR / 'geo' / 'CA-townships-2023.geojson')
   townships['MeridianTownshipRange'] = townships['Meridian'] + " " +  townships['TownshipRange']
   townships['MeridianTownshipRange'] = townships['MeridianTownshipRange'].str.strip()
   townships = townships[townships['MeridianTownshipRange'] != '']
@@ -83,7 +83,7 @@ def main():
     townships, 
     'GEOID',
     "MeridianTownshipRange",
-    '../data/census_geos/crosswalks/townships-to-tracts.parquet', 
+    DATA_DIR /'census_geos' / 'crosswalks' / 'townships-to-tracts.parquet', 
   )
 if __name__ == "__main__":
   main()
