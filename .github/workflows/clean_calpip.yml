@@ -3,6 +3,7 @@ on: [workflow_dispatch]
 jobs:
   Update-CalPip-Data:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - name: Install Python
@@ -24,16 +25,10 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-        with:
-          command_timeout: 30m
       - name: Clean CalPIP Data
         run: python cli clean_calpip
-        with:
-          command_timeout: 60m
       - name: Upload Clean CalPIP Data
         run: python cli upload_clean_calpip_data
-        with:
-          command_timeout: 60m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -41,16 +36,10 @@ jobs:
           AWS_REGION: ${{ secrets.AWS_REGION }}
       - name: Parse Meta
         run: python cli parse_meta
-        with:
-          command_timeout: 60m
       - name: Join Census Units
         run: python cli join_census_units
-        with:
-          command_timeout: 120m
       - name: Upload Final Outputs
         run: python cli upload_final_outputs
-        with:
-          command_timeout: 60m
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
