@@ -61,5 +61,6 @@ OUTPUT_FILENAMES = [
   
 BUCKETS = {
   "raw": 'pesticide-explorer-raw-data',
-  "output": "test-bucket-osl-cpr" #'wby-fm-bucket-e1e0e98'
+  "output": "test-bucket-osl-cpr", #'wby-fm-bucket-e1e0e98'
+  "output_backup": "cpr-pan-backup"
 }

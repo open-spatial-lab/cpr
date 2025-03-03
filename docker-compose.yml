@@ -1,9 +1,12 @@
+version: '3.7'
 services:
-  app:
+  pipeline:
     build:
       context: .
-    container_name: pesticide-analysis-cli
+      dockerfile: Dockerfile
     volumes:
-      - ./cli:/app/cli
       - ./data:/app/data
-    entrypoint: ["python", "cli"]
+      - ./cli:/app/cli
+    tty: true
+    stdin_open: true
+    entrypoint: sh

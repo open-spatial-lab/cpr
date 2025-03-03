@@ -7,3 +7,6 @@ bs4
 boto3
 geopandas
 dotenv
+openpyxl
+polars
+fastexcel

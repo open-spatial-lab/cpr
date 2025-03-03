@@ -1,5 +1,4 @@
-# python 3.10 slim image
-FROM python:3.10-slim
+FROM python:3.12
 
 # Set the working directory
 WORKDIR /app
@@ -11,4 +10,7 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application files
-COPY . /app
+COPY . .
+
+# run main.sh
+CMD ["sh", "main.sh"]
