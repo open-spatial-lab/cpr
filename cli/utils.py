@@ -43,6 +43,23 @@ class DataDownloader:
     ):
         self.s3.upload_file(localfilepath, self.bucket, s3filepath)
 
+    def move_file(
+            self,
+            bucket1,
+            s3filepath1,
+            bucket2,
+            s3filepath2
+    ):
+        self.s3.copy_object(
+            CopySource={
+                'Bucket': bucket1,
+                'Key': s3filepath1
+            },
+            Bucket=bucket2,
+            Key=s3filepath2
+        )
+        self.s3.delete_object(Bucket=bucket1, Key=s3filepath1)
+        
     def upload_folder(
             self,
             s3folderpath,
@@ -115,6 +132,11 @@ def upload_clean_calpip_data():
 def upload_final_outputs():
     s3 = DataDownloader(BUCKETS['output'])
     for fileconfig in OUTPUT_FILENAMES:
+        # if file exists copy to backup bucket
+        try:
+            s3.move_file(BUCKETS['output'], fileconfig['s3filepath'], BUCKETS['output_backup'], fileconfig['s3filepath'])
+        except Exception as e:
+            print(f"Error moving {fileconfig['s3filepath']} to backup bucket: {e}")
         s3.upload_file(**fileconfig)
 
 def clear_cache():
