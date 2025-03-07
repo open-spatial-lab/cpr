@@ -144,8 +144,12 @@ def clean_calpip(
     print('str conversion done')
     df.to_parquet(CALPIP_DIR / f"calpip_{year}.parquet")
     print('parquet conversion done')
-    with open(BASE_DIR / f"files_to_remove.txt", 'a') as f:
+    # if files_to_remove exists
+    to_remove_exists = (BASE_DIR / f"files_to_remove.txt").exists()
+    action = 'a' if to_remove_exists else 'w'
+    with open(BASE_DIR / f"files_to_remove.txt", action) as f:
       f.write(f"calpip/{filename}.zip\n")
+
     return {
       "ok": True,
       "result": df
