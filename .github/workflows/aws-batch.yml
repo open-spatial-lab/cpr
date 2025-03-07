@@ -1,11 +1,11 @@
-name: Deploy and Run AWS Batch Job
+name: Run AWS Batch Job
 
 on:
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 jobs:
   deploy-and-run:
-    name: Deploy and Trigger AWS Batch Job
+    name: Trigger AWS Batch Job
     runs-on: ubuntu-latest
 
     steps:
@@ -19,25 +19,9 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Authenticate Docker to Amazon ECR
-        run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-
-      - name: Build Docker Image
-        run: |
-          docker build -t ${{ secrets.ECR_REPOSITORY_NAME }} .
-
-      - name: Tag Docker Image
-        run: |
-          docker tag ${{ secrets.ECR_REPOSITORY_NAME }}:latest ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY_NAME }}:latest
-
-      - name: Push Docker Image to Amazon ECR
-        run: |
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ secrets.ECR_REPOSITORY_NAME }}:latest
-
       - name: Submit AWS Batch Job
         run: |
           aws batch submit-job \
             --job-name ${{ secrets.BATCH_JOB_NAME }} \
             --job-queue ${{ secrets.BATCH_QUEUE_NAME }} \
-            --job-definition ${{ secrets.BATCH_JOB_NAME }}
+            --job-definition ${{ secrets.BATCH_JOB_DEFINITION }}
