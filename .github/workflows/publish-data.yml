@@ -18,6 +18,8 @@ concurrency: publish-data
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # secrets live in the `data` environment, which only runs from main (see RUNBOOK.md)
+    environment: data
     timeout-minutes: 5
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}

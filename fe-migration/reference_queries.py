@@ -2,7 +2,7 @@
 # Port these builders to TypeScript; this script checks them against fixtures.json (live nectr API snapshots).
 #   python fe-migration/reference_queries.py data/r2                      # local build
 #   python fe-migration/reference_queries.py https://<r2-public-host>/v1  # what's on R2 (needs CORS + range support)
-import json, sys
+import json, re, sys
 from pathlib import Path
 import duckdb
 
@@ -25,6 +25,11 @@ def lit(csv):
 
 
 def where(p):
+  # values can come from a shared link: allowlist what has a fixed set of values, escape the rest with lit()
+  if not all(re.fullmatch(r"\d{4}-\d{2}", str(p[k])) for k in ("start", "end")):
+    raise ValueError("start and end must be YYYY-MM")
+  if p.get("usetype", "*") not in ("AG", "NON-AG", "*"):
+    raise ValueError("usetype must be AG, NON-AG or *")
   w = [f"monthyear between {lit(p['start'])} and {lit(p['end'])}"]
   if p.get("usetype", "*") != "*": w.append(f"usetype = {lit(p['usetype'])}")
   if p.get("aerial_ground", "*") != "*": w.append(f"aerial_ground in ({lit(p['aerial_ground'])})")
@@ -41,7 +46,8 @@ def where(p):
 
 def use_by(geo, p, keys):
   """chm/prd summed by `keys`. In use/, prd repeats on each AI row of a cell, so max() it per cell before summing."""
-  if DETAIL_PARAMS & p.keys():
+  # summary/ has no site, product or AI columns, so anything that filters or groups on them reads use/
+  if DETAIL_PARAMS & p.keys() or "chem_code" in keys or "prodno" in keys:
     return f"""select {keys}, sum(chm) chm, sum(prd) prd from (
         select {keys}, county_cd, monthyear, usetype, aerial_ground, site_code, prodno, sum(chm) chm, max(prd) prd
         from '{BASE}/use/{geo}.parquet' where {where(p)} group by all
@@ -85,6 +91,10 @@ def check():
   fx = json.load(open(Path(__file__).parent / "fixtures.json"))
   con = duckdb.connect()
   con.sql("install httpfs; load httpfs") if BASE.startswith("http") else None
+  try:  # the township waiver below never applies to v1 itself
+    version = con.sql(f"select version from read_json('{BASE}/manifest.json')").fetchone()[0]
+  except duckdb.Error:
+    version = None
   failures = 0
   for case in fx["cases"]:
     p = case["params"]
@@ -105,7 +115,9 @@ def check():
       # use/ stores float32, so filtered totals can differ from the API past the 6th significant digit
       # `not <=` so NaN counts as a mismatch
       problems += [f"{[e[k] for k in key]} {c}: {r[c]} vs api {e[c]}" for c in cols if not abs(r[c] - e[c]) <= max(0.02, 1e-4 * abs(e[c]))]
-    expected = problems and case["name"] in EXPECTED_AFTER_V1
+    # waived only for later builds, and only if every geography is still there (same total row count)
+    expected = (problems and case["name"] in EXPECTED_AFTER_V1 and version != "v1"
+                and not any(p.endswith(f"rows, api {case.get('api_row_count')}") for p in problems))
     failures += bool(problems) and not expected
     print(f"{'ok  ' if not problems else 'diff (expected after v1)' if expected else 'FAIL'} {case['name']:26} {problems[:3]}")
   print("all cases match the API" if not failures else f"{failures} cases differ")

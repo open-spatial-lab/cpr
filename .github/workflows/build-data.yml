@@ -1,5 +1,5 @@
-# Builds the explorer's data from the inputs in R2 (raw/, a mirror of data/) and uploads it as a new version.
-# Doesn't change the live site: it points preview.json (the site's ?preview link) at the build.
+# Builds the explorer's data from the inputs bucket (a mirror of data/) and uploads it to the site bucket as a new
+# version. Doesn't change the live site: it points preview.json (the site's ?preview link) at the build.
 # Check the summary page, then run "Publish data" to make it live.
 name: Build data
 
@@ -16,14 +16,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # secrets live in the `data` environment, which only runs from main (see RUNBOOK.md)
+    environment: data
     env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
       AWS_DEFAULT_REGION: auto
       # aws-cli >= 2.23 sends integrity checksums by default that R2 rejects
       AWS_REQUEST_CHECKSUM_CALCULATION: when_required
       AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
       AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      INPUTS: s3://${{ vars.R2_RAW_BUCKET }}
       BUCKET: s3://${{ vars.R2_BUCKET }}
       SITE_URL: ${{ vars.SITE_URL }}
     steps:
@@ -33,13 +34,19 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
-      - name: Check the cleaning logic
-        run: python3 cli/check_clean.py
-
-      - name: Download inputs
-        # only what the pipeline reads; raw/ may hold other reference files
+      - name: Check the pipeline logic
         run: |
-          aws s3 sync "$BUCKET/raw" data --only-show-errors --exclude "*" \
+          python3 cli/check_clean.py
+          python3 cli/check_build.py
+
+      # the R2 key is only given to the steps that talk to R2, not to pip or the parsers
+      - name: Download inputs
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        # only what the pipeline reads; the inputs bucket may hold other reference files
+        run: |
+          aws s3 sync "$INPUTS" data --only-show-errors --exclude "*" \
             --include "calpip/calpip_20*.parquet" --include "calpip/*.zip" --include "pur/meta/*" \
             --include "census_data/ca-county-dpr-xwalk.csv" --include "census_geos/crosswalks/*" \
             --include "output/ca-*-demography.parquet"
@@ -51,6 +58,9 @@ jobs:
           python3 cli build_r2
 
       - name: Upload
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: |
           VERSION=v$(date -u +%Y%m%d-%H%M)
           aws s3 sync data/r2 "$BUCKET/$VERSION" --only-show-errors --exclude manifest.json \
@@ -65,11 +75,20 @@ jobs:
             echo "When it looks right, run **Publish data** with version \`$VERSION\`. A blank version publishes the latest build, which is this one unless Build data has run again since."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Compare with the live site
+      - name: Fetch the live build
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: |
           LIVE=$(aws s3 cp "$BUCKET/manifest.json" - 2>/dev/null | jq -r '.version // empty' || true)
+          echo "LIVE=$LIVE" >> "$GITHUB_ENV"
           if [ -n "$LIVE" ]; then
             aws s3 cp "$BUCKET/$LIVE/summary/county.parquet" live/summary/county.parquet --only-show-errors
+          fi
+
+      - name: Compare with the live site
+        run: |
+          if [ -n "$LIVE" ]; then
             echo "### Yearly totals vs the live site (\`$LIVE\`)" >> "$GITHUB_STEP_SUMMARY"
             python3 cli compare data/r2 live >> "$GITHUB_STEP_SUMMARY"
           else

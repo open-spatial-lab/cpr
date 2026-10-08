@@ -42,7 +42,7 @@ def main():
     where chem_code::varchar not in (select unnest(?::varchar[])) order by chem_name""", params=[listed]).fetchall()
   if missing:
     print(f"\n**{len(missing)} chemicals have no class, use type or health information**, so those filters skip them. "
-          "Add them to `raw/pur/meta/AI Cat Data.xlsx`: " + ", ".join(f"{name} ({code})" for code, name in missing))
+          "Add them to `pur/meta/AI Cat Data.xlsx` in the inputs bucket: " + ", ".join(f"{name} ({code})" for code, name in missing))
 
 
 if __name__ == "__main__":

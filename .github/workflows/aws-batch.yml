@@ -12,6 +12,7 @@ jobs:
   deploy-and-run:
     name: Trigger AWS Batch Job
     runs-on: ubuntu-latest
+    environment: data
 
     steps:
       - name: Checkout Repository

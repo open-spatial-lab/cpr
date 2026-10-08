@@ -62,8 +62,10 @@ def convert_zips(con):
 
 
 def build_full(con):
-  # meridian + township + range come straight from COMTRS (CCMTTDRRDSS, e.g. 34M03N03E01 -> MDM T03N R03E)
-  con.sql(f"""copy (select
+  # meridian + township + range come straight from COMTRS (CCMTTDRRDSS, e.g. 34M03N03E01 -> MDM T03N R03E).
+  # Rows whose DATE doesn't parse (blank, 'nan', or the shifted half of a record split by a line break) can't be
+  # placed in any month, so no query could reach them; drop them here instead of carrying a null month along.
+  con.sql(f"""copy (select * from (select
       {text('ADJUVANT')} adjuvant,
       {text('COMTRS')} comtrs,
       {num('POUNDS_CHEMICAL_APPLIED')} lbs_chm_used,
@@ -82,8 +84,7 @@ def build_full(con):
         || ' T' || COMTRS[4:6] || ' R' || COMTRS[7:9] end MeridianTownshipRange,
       '20' || DATE[-2:] || '-' || lpad(list_position({MONTHS}, DATE[4:6])::varchar, 2, '0') monthyear
     from read_parquet('{CALPIP_DIR}/calpip_20*.parquet', union_by_name=true)
-    where {text('DATE')} is not null
-  ) to '{CALPIP_DIR}/calpip_full.parquet' (compression zstd)""")
+  ) where monthyear is not null) to '{CALPIP_DIR}/calpip_full.parquet' (compression zstd)""")
 
 
 def main():
