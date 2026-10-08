@@ -1,257 +1,98 @@
-# %% 
-import pandas as pd
-import geopandas as gpd
-from glob import glob
-import numpy as np
-from pathlib import Path
+# CalPIP year exports -> data/calpip/calpip_full.parquet (one row per application x active ingredient).
+#   1. each data/calpip/*.zip (tab-separated CalPIP export) -> data/calpip/calpip_{year}.parquet, raw text
+#   2. every calpip_{year}.parquet -> calpip_full.parquet, cleaned and typed
+# Older calpip_{year}.parquet files came from the previous pandas version (missing values as 'nan', codes like
+# '3551.0'); the cleaning below handles both. DuckDB streams, so memory stays flat as years are added.
+import shutil
 import zipfile
-BASE_DIR = Path(__file__).parent.parent
-DATA_DIR = BASE_DIR / "data"
-CALPIP_DIR = DATA_DIR / "calpip"
-CALPIP_FILES = glob(str(CALPIP_DIR / "*.zip"))
+from pathlib import Path
+import duckdb
 
-DATE_COLS = [
-  'DATE',
-]
-COLS_TO_KEEP = [
-  'ADJUVANT', 
-  # 'DATE', 
-  # 'COUNTY_NAME', 
-  'COMTRS', 
-  # 'SITE_NAME',
-  # 'PRODUCT_NAME', 
-  'POUNDS_PRODUCT_APPLIED', 
-  # 'CHEMICAL_NAME',
-  # 'AMOUNT_TREATED', 
-  # 'UNIT_TREATED',
-  'AERIAL_GROUND_INDICATOR', 
-  'AERIAL_GROUND_DESCRIPTION', 
-  'AG_NONAG',
-  'AMOUNT_PLANTED', 
-  # 'AMOUNT_PRODUCT_APPLIED', 
-  # 'APPLICATION_MONTH',
-  'CHEMICAL_CODE', 
-  'COUNTY_CODE', 
-  # 'GROWER_ID', 
-  'LICENSE_NUMBER',
-  'OUTLIER', 
-  # 'PERMITTING_COUNTY_NAME', 
-  # 'PERMIT_NUMBER',
-  # 'PERMIT_YEAR', 
-  # 'PLANTING_SEQUENCE', 
-  'PRODUCT_CHEMICAL_PERCENT',
-  'PRODUCT_NUMBER', 
-  # 'QUALIFY_CODE', 
-  # 'REGISTRATION_NUMBER', 
-  'SITE_CODE',
-  'SITE_LOCATION_ID', 
-  # 'UNITS_PRODUCT_APPLIED', 
-  # 'UNIT_PLANTED',
-  # 'UNIT_PLANTED_DESCRIPTION', 
-  # 'UNIT_PRODUCT_APPLIED',
-  # 'UNIT_TREATED_DESCRIPTION', 
-  'USE_NUMBER'
-]
-SUM_COL = [
-  'POUNDS_CHEMICAL_APPLIED'
+CALPIP_DIR = Path(__file__).resolve().parent.parent / "data" / "calpip"
+MONTHS = "['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']"
+REQUIRED = [
+  "YEAR", "DATE", "ADJUVANT", "COMTRS", "AERIAL_GROUND_INDICATOR", "AG_NONAG", "AMOUNT_PLANTED", "CHEMICAL_CODE",
+  "COUNTY_CODE", "POUNDS_CHEMICAL_APPLIED", "POUNDS_PRODUCT_APPLIED", "PRODUCT_CHEMICAL_PERCENT", "PRODUCT_NUMBER",
+  "SITE_CODE", "USE_NUMBER",
 ]
 
-COLUMN_MAPPING = {
-  "ADJUVANT": "adjuvant",
-  "DATE": "date",
-  'COMTRS': "comtrs",
-  'POUNDS_CHEMICAL_APPLIED':"lbs_chm_used",
-  'AERIAL_GROUND_INDICATOR': "aerial_ground",
-  # 'AERIAL_GROUND_DESCRIPTION', 
-  'AG_NONAG': "usetype",
-  'AMOUNT_PLANTED': "amount_planted",
-  'CHEMICAL_CODE': "chem_code",
-  'COUNTY_CODE': 'county_cd', 
-  # 'GROWER_ID': "grower_id",
-  # 'LICENSE_NUMBER',
-  # 'OUTLIER', 
-  'POUNDS_PRODUCT_APPLIED': "lbs_prd_used",
-  'PRODUCT_CHEMICAL_PERCENT': "prodchem_pct",
-  'PRODUCT_NUMBER': "prodno",
-  'SITE_CODE': "site_code",
-  "USE_NUMBER": "use_number",
-  # 'SITE_LOCATION_ID', 
-}
 
-NUMERIC_COLS = [
-  'lbs_chm_used',
-  'amount_planted',
-  'lbs_prd_used',
-  'prodchem_pct'
-]
+def num(col):  # blank, 'nan' or junk ('MARCH', 'ACRES') -> 0
+  return f"coalesce(nullif(try_cast({col} as double), 'nan'::double), 0)"
 
-NUMERIC_REPLACEMENTS = [
-  'nan',
-  'MARCH',
-  'ACRES'
-]
 
-STRING_INT_COLS = [
-  'chem_code',
-  'county_cd',
-  'prodno',
-  'site_code',
-]
+def code(col):  # '3551' or '3551.0' -> '3551'; blank or junk ('GA') -> '0'
+  return f"coalesce(try_cast(trunc(nullif(try_cast({col} as double), 'nan'::double)) as bigint), 0)::varchar"
 
-STRING_INT_REPLACEMENTS = [
-  "GA"
-]
 
-def clean_calpip(
-    filepath,
-    date_format_in='%d-%b-%y',
-    date_format_out='%Y-%m',
-    df=None
-  ):
-  # unzip filepath
-  with zipfile.ZipFile(filepath, 'r') as zip_ref:
-      zip_ref.extractall(filepath.replace('.zip', ''))
-  try: 
-    if df is None:
-      filename = filepath.split('/')[-1].replace('.zip', '')
-      txtpath = filepath.replace('.zip', f'/{filename}.txt')
-      df = pd.read_csv(txtpath, sep="\t")
-    else:
-      df = df.copy()
-    print('file read')
+def text(col):
+  return f"nullif({col}, 'nan')"
 
-    initial_rows = df.shape[0]
-    df = df[(df.DATE.notna())]
-    rows_after_date_notna = df.shape[0]
-    if initial_rows != rows_after_date_notna:
-      print('rows dropped:', initial_rows - rows_after_date_notna)
-    df['MONTHYEAR'] = pd.to_datetime(
-      df['DATE'], 
-      format=date_format_in,
-      errors="coerce")\
-        .dt.strftime(date_format_out)
-    print('date conversion done')
-    year = int(df[df.YEAR.notna()]['YEAR'].mode()[0])
-    if year is None or year == 0:
-      # error
-      raise Exception('Year not found')
-    df['YEAR'] = int(year)
-    
-    for col in df.columns:
-      if col != "YEAR":
-        df[col] = df[col].astype(str)
-      
-    print('str conversion done')
-    df.to_parquet(CALPIP_DIR / f"calpip_{year}.parquet")
-    print('parquet conversion done')
-    # if files_to_remove exists
-    to_remove_exists = (BASE_DIR / f"files_to_remove.txt").exists()
-    action = 'a' if to_remove_exists else 'w'
-    with open(BASE_DIR / f"files_to_remove.txt", action) as f:
-      f.write(f"calpip/{filename}.zip\n")
 
-    return {
-      "ok": True,
-      "result": df
-    }
-  except Exception as e:
-    print('Error:', e)
-    print('file:', filepath)
-    return {
-      "ok": False,
-      "error": e,
-      "result": df
-    }
+def convert_zips(con):
+  done = {}
+  # oldest upload first, so if two zips cover the same year the newest one wins (aws s3 sync keeps upload times)
+  for zip_path in sorted(CALPIP_DIR.glob("*.zip"), key=lambda p: p.stat().st_mtime):
+    print("Converting", zip_path.name)
+    with zipfile.ZipFile(zip_path) as z:
+      txt = next((n for n in z.namelist() if n.lower().endswith(".txt")), None)
+      if not txt:
+        raise ValueError(f"{zip_path.name} has no .txt file inside. Upload the zip exactly as CalPIP sent it.")
+      # fixed name: the name inside an uploaded zip never reaches the SQL below
+      txt_path = CALPIP_DIR / "unzipped.txt"
+      with z.open(txt) as src_file, open(txt_path, "wb") as out:
+        shutil.copyfileobj(src_file, out)
+    # null_padding / strict_mode off: CalPIP exports can contain a line break inside a field (2021 has one),
+    # which splits that record in two; pandas read those rows the same way
+    src = f"read_csv('{txt_path}', delim='\t', header=true, all_varchar=true, null_padding=true, strict_mode=false)"
+    # zips are uploaded by hand: fail with a readable message if this isn't a full, unsummarized CalPIP export
+    missing = sorted(set(REQUIRED) - {c[0] for c in con.sql(f"describe select * from {src}").fetchall()})
+    if missing:
+      raise ValueError(f"{zip_path.name} is missing CalPIP columns {missing}. Re-request it with all output columns "
+                       "and 'Summarize the data' unchecked.")
+    year = con.sql(f"select mode(try_cast(try_cast(YEAR as double) as int)) from {src}").fetchone()[0]
+    if not year:
+      raise ValueError(f"{zip_path.name}: no YEAR")
+    if year in done:
+      print(f"  {year} is in both {done[year]} and {zip_path.name}; using {zip_path.name}, the newer upload")
+    done[year] = zip_path.name
+    # a zip replaces any existing parquet for its year (a re-pull from CalPIP)
+    con.sql(f"copy (select * from {src}) to '{CALPIP_DIR}/calpip_{year}.parquet' (compression zstd)")
+    txt_path.unlink()
 
-def clean_parquets():
-  calpip_parquets = glob(str(CALPIP_DIR / "calpip_20*.parquet"))
-  dfs = []
-  for file in calpip_parquets:
-    print(file)
-    dfs.append(pd.read_parquet(file)[COLUMN_MAPPING.keys()])
-  df = pd.concat(dfs)
-  df = df.rename(columns=COLUMN_MAPPING)
-  return df
 
-def clean_columns(df, numeric_cols=NUMERIC_COLS, numeric_replacements=NUMERIC_REPLACEMENTS, string_int_cols=STRING_INT_COLS, string_int_replacements=STRING_INT_REPLACEMENTS):
-  df = df.copy()
-  for col in numeric_cols:
-    for rep in numeric_replacements:
-      df.loc[df[col] == rep, col] = np.nan
-    df[col] = pd.to_numeric(df[col]).fillna(0)
+def build_full(con):
+  # meridian + township + range come straight from COMTRS (CCMTTDRRDSS, e.g. 34M03N03E01 -> MDM T03N R03E).
+  # Rows whose DATE doesn't parse (blank, 'nan', or the shifted half of a record split by a line break) can't be
+  # placed in any month, so no query could reach them; drop them here instead of carrying a null month along.
+  con.sql(f"""copy (select * from (select
+      {text('ADJUVANT')} adjuvant,
+      {text('COMTRS')} comtrs,
+      {num('POUNDS_CHEMICAL_APPLIED')} lbs_chm_used,
+      {text('AERIAL_GROUND_INDICATOR')} aerial_ground,
+      {text('AG_NONAG')} usetype,
+      {num('AMOUNT_PLANTED')} amount_planted,
+      {code('CHEMICAL_CODE')} chem_code,
+      {code('COUNTY_CODE')} county_cd,
+      {num('POUNDS_PRODUCT_APPLIED')} lbs_prd_used,
+      {num('PRODUCT_CHEMICAL_PERCENT')} prodchem_pct,
+      {code('PRODUCT_NUMBER')} prodno,
+      {code('SITE_CODE')} site_code,
+      {text('USE_NUMBER')} use_number,
+      case when length(COMTRS) >= 9 then
+        case COMTRS[3] when 'H' then 'HM' when 'M' then 'MDM' when 'S' then 'SBM' end
+        || ' T' || COMTRS[4:6] || ' R' || COMTRS[7:9] end MeridianTownshipRange,
+      '20' || DATE[-2:] || '-' || lpad(list_position({MONTHS}, DATE[4:6])::varchar, 2, '0') monthyear
+    from read_parquet('{CALPIP_DIR}/calpip_20*.parquet', union_by_name=true)
+  ) where monthyear is not null) to '{CALPIP_DIR}/calpip_full.parquet' (compression zstd)""")
 
-  for col in string_int_cols:
-    for rep in string_int_replacements:
-      df.loc[df[col] == rep, col] = np.nan
-    df[col] = pd.to_numeric(df[col], errors='coerce')
-    df[col] = df[col].fillna(0).astype(int).astype(str).fillna('')
 
-  return df
-
-def convert_comtrs(comtrs):
-    if len(comtrs) < 9:
-      return None
-    township_number = comtrs[3:5]
-    township_direction = comtrs[5]
-    range_number = comtrs[6:8]
-    range_direction = comtrs[8]
-    return f"T{township_number}{township_direction} R{range_number}{range_direction}"
-
-# %%
-def get_sections():
-  townships = gpd.read_file(DATA_DIR / 'geo'/ 'PLSS Township Range California.geojson')
-  meridians = townships.dissolve(by='Meridian').reset_index()
-  meridians = meridians[['Meridian', 'geometry']]
-  meridians = meridians.to_crs("EPSG:3310")
-
-  sections = gpd.read_parquet(DATA_DIR / 'sections'/ 'sections.parquet')
-  sections = sections.to_crs("EPSG:3310")
-  sections['centroid'] = sections.centroid
-  sections = sections.set_geometry('centroid')
-  # sjoin to
-  sections = gpd.sjoin(sections, meridians, predicate='within')
-  sections = sections[['CO_MTRS', 'Meridian']]
-  return sections
-# %%
-month_dict = {
-  "JAN": '01',
-  "FEB": '02',
-  "MAR": '03',
-  "APR": '04',
-  "MAY": '05',
-  "JUN": '06',
-  "JUL": '07',
-  "AUG": '08',
-  "SEP": '09',
-  "OCT": '10',
-  "NOV": '11',
-  "DEC": '12'
-}
-
-def clean_years(df, month_dict=month_dict):
-  df['year'] = '20' + df['date'].str.slice(-2,)
-  df['month'] = df['date'].str.slice(3, 6).map(month_dict)
-  df['monthyear'] = df['year'] + '-' + df['month']
-  return df
-# %%
 def main():
-  for file in CALPIP_FILES:
-    print('Cleaning:', file)
-    clean_calpip(file)
+  con = duckdb.connect()
+  con.sql("set preserve_insertion_order = false")
+  convert_zips(con)
+  build_full(con)
 
-  df = clean_parquets()
-  df = clean_columns(df)
-  df['TownshipRange'] = df['comtrs'].apply(convert_comtrs)
-  
-  sections = get_sections()
-  df = df.merge(sections, left_on='comtrs', right_on='CO_MTRS', how='left')
-  df['MeridianTownshipRange'] = df['Meridian'] + ' ' + df['TownshipRange']
-  
-  df = clean_years(df)
-  to_drop = ['date', 'year', 'month', 'TownshipRange', "CO_MTRS", "Meridian"]
-  
-  df = df.drop(columns=to_drop)
-  df.to_parquet(CALPIP_DIR / 'calpip_full.parquet', compression='gzip')
 
 if __name__ == "__main__":
   main()

@@ -1,0 +1,97 @@
+# Builds the explorer's data from the inputs bucket (a mirror of data/) and uploads it to the site bucket as a new
+# version. Doesn't change the live site: it points preview.json (the site's ?preview link) at the build.
+# Check the summary page, then run "Publish data" to make it live.
+name: Build data
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# its own group, so a queued Build never cancels a queued Publish (GitHub keeps one pending run per group)
+concurrency: build-data
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # secrets live in the `data` environment, which only runs from main (see RUNBOOK.md)
+    environment: data
+    env:
+      AWS_DEFAULT_REGION: auto
+      # aws-cli >= 2.23 sends integrity checksums by default that R2 rejects
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      INPUTS: s3://${{ vars.R2_RAW_BUCKET }}
+      BUCKET: s3://${{ vars.R2_BUCKET }}
+      SITE_URL: ${{ vars.SITE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Check the pipeline logic
+        run: |
+          python3 cli/check_clean.py
+          python3 cli/check_build.py
+
+      # the R2 key is only given to the steps that talk to R2, not to pip or the parsers
+      - name: Download inputs
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        # only what the pipeline reads; the inputs bucket may hold other reference files
+        run: |
+          aws s3 sync "$INPUTS" data --only-show-errors --exclude "*" \
+            --include "calpip/calpip_20*.parquet" --include "calpip/*.zip" --include "pur/meta/*" \
+            --include "census_data/ca-county-dpr-xwalk.csv" --include "census_geos/crosswalks/*" \
+            --include "output/ca-*-demography.parquet"
+
+      - name: Build
+        run: |
+          python3 cli clean
+          python3 cli meta
+          python3 cli build_r2
+
+      - name: Upload
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          VERSION=v$(date -u +%Y%m%d-%H%M)
+          aws s3 sync data/r2 "$BUCKET/$VERSION" --only-show-errors --exclude manifest.json \
+            --cache-control "public, max-age=31536000, immutable"
+          jq --arg v "$VERSION" --arg c "$GITHUB_SHA" '. + {version: $v, commit: $c}' data/r2/manifest.json > manifest.json
+          aws s3 cp manifest.json "$BUCKET/$VERSION/manifest.json" --content-type application/json --only-show-errors
+          aws s3 cp manifest.json "$BUCKET/preview.json" --content-type application/json --cache-control no-cache --only-show-errors
+          {
+            echo "## Built \`$VERSION\`"
+            echo "Years $(jq -r '"\(.start_year)–\(.end_year)"' manifest.json). Not live yet."
+            if [ -n "$SITE_URL" ]; then echo "Preview it at $SITE_URL?preview"; fi
+            echo "When it looks right, run **Publish data** with version \`$VERSION\`. A blank version publishes the latest build, which is this one unless Build data has run again since."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fetch the live build
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          LIVE=$(aws s3 cp "$BUCKET/manifest.json" - 2>/dev/null | jq -r '.version // empty' || true)
+          echo "LIVE=$LIVE" >> "$GITHUB_ENV"
+          if [ -n "$LIVE" ]; then
+            aws s3 cp "$BUCKET/$LIVE/summary/county.parquet" live/summary/county.parquet --only-show-errors
+          fi
+
+      - name: Compare with the live site
+        run: |
+          if [ -n "$LIVE" ]; then
+            echo "### Yearly totals vs the live site (\`$LIVE\`)" >> "$GITHUB_STEP_SUMMARY"
+            python3 cli compare data/r2 live >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Yearly totals (nothing published yet)" >> "$GITHUB_STEP_SUMMARY"
+            python3 cli compare data/r2 >> "$GITHUB_STEP_SUMMARY"
+          fi
