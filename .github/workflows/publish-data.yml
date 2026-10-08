@@ -1,0 +1,49 @@
+# Makes a build live by pointing /manifest.json at it. The site reads manifest.json on load, so no rebuild is needed.
+# Leave the version blank to publish the latest "Build data" run (what the ?preview link shows).
+# To undo a publish, run this again with the previous version.
+name: Publish data
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish, e.g. v20270115-0930. Blank = the latest build.
+        required: false
+
+concurrency: data
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      AWS_ENDPOINT_URL: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      BUCKET: s3://${{ vars.R2_BUCKET }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Publish
+        run: |
+          VERSION="${VERSION//[[:space:]]/}"
+          if [ -z "$VERSION" ]; then
+            SRC="$BUCKET/preview.json"
+          elif [[ "$VERSION" =~ ^v[0-9A-Za-z-]+$ ]]; then
+            SRC="$BUCKET/$VERSION/manifest.json"
+          else
+            echo "::error::'$VERSION' isn't a version name (they look like v20270115-0930)"; exit 1
+          fi
+          if ! aws s3 cp "$SRC" manifest.json --only-show-errors; then
+            echo "::error::No build found at $SRC"; exit 1
+          fi
+          PREVIOUS=$(aws s3 cp "$BUCKET/manifest.json" - 2>/dev/null | jq -r '.version // empty' || true)
+          PREVIOUS=${PREVIOUS:-nothing}
+          aws s3 cp manifest.json "$BUCKET/manifest.json" --content-type application/json --cache-control no-cache --only-show-errors
+          {
+            echo "## Published \`$(jq -r .version manifest.json)\`"
+            echo "Years $(jq -r '"\(.start_year)–\(.end_year)"' manifest.json). Replaced \`$PREVIOUS\`."
+            echo "To undo, run Publish data with version \`$PREVIOUS\`."
+          } >> "$GITHUB_STEP_SUMMARY"
