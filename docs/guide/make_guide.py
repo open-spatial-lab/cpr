@@ -60,7 +60,7 @@ def shot(file, width=4.8 * inch):
 
 def flow_diagram():
   d = Drawing(WIDTH, 78)
-  labels = [("1  CalPIP", "Request a year,", "download the zip"), ("2  Cyberduck", "Upload the zip to", "R2: raw/calpip/"),
+  labels = [("1  CalPIP", "Request a year,", "download the zip"), ("2  Cyberduck", "Upload the zip to", "R2: calpip/"),
             ("3  Build data", "Run it on GitHub,", "check the preview"), ("4  Publish data", "Run it on GitHub;", "the site updates")]
   w, gap = 100, (WIDTH - 4 * 100) / 3
   for i, (title, l1, l2) in enumerate(labels):
@@ -121,14 +121,15 @@ story = [
       "<b>A GitHub account</b> with permission to run Actions in the <b>open-spatial-lab/cpr</b> repository. Dylan can "
       "add you.",
     ]),
-    P(f"Storage bucket: {code('pesticide-data')}<br/>Explorer website: ______________________________"),
+    P(f"Upload bucket: {code('pesticide-data-raw')}<br/>Explorer website: ______________________________"),
   ]),
   P("Key terms", h3),
   bullets([
     "<b>CalPIP</b>: the website of the California Department of Pesticide Regulation (DPR) for downloading "
     "Pesticide Use Report (PUR) data.",
     "<b>Cloudflare R2</b>: online file storage, similar to Dropbox or Google Drive. The explorer's data lives here.",
-    f"<b>Bucket</b>: the top-level folder for a project in R2. This project's is {code('pesticide-data')}.",
+    f"<b>Bucket</b>: a top-level folder in R2. Uploads go to {code('pesticide-data-raw')}; the site's own data is in a "
+    "separate bucket that only the Build and Publish jobs change.",
     "<b>Cyberduck</b>: a free app for moving files to and from online storage such as R2.",
     "<b>GitHub Actions</b>: buttons on GitHub that run scripts. <i>Build data</i> and <i>Publish data</i> are two of them.",
     "<b>Build</b>: a complete processed copy of the explorer's data, named by the date and time it was made, such as "
@@ -157,7 +158,7 @@ story = [
          "rename the file inside it, or edit it. The link expires after 7 days."], start=5),
 
   P("2. Upload the zip with Cyberduck", h2),
-  P(f"The zip goes in the folder {code('raw/calpip/')} in the {code('pesticide-data')} bucket. That folder holds one "
+  P(f"The zip goes in the folder {code('calpip/')} in the {code('pesticide-data-raw')} bucket. That folder holds one "
     f"file per year: zips that people have uploaded, and files named {code('calpip_&lt;year&gt;.parquet')} for older "
     "years. Don't delete or rename those; every build uses all of them. Cyberduck handles files of any size."),
   P("Connect (first time only)", h3),
@@ -170,11 +171,12 @@ story = [
   ]),
   P("Upload", h3),
   steps([
-    f"Double-click {code('pesticide-data')}, then {code('raw')}, then {code('calpip')}.",
+    f"Double-click {code('pesticide-data-raw')}, then {code('calpip')}.",
     "Drag the zip from your computer into the Cyberduck window. Wait until the transfer window says it's complete.",
   ]),
-  box([P("<b>Stay in raw/calpip/.</b> The upload key can change anything in the bucket, including the data the live "
-         "site uses. Only add or delete files in raw/calpip/.")], tint=WARN_TINT, edge=colors.HexColor("#c9a227")),
+  box([P("<b>Stay in calpip/.</b> The other folders in this bucket hold inputs that every build uses. Only add or "
+         "delete files in calpip/ unless Dylan asks you to update one of the others.")],
+      tint=WARN_TINT, edge=colors.HexColor("#c9a227")),
   Spacer(1, 6),
   box([P("<b>Replacing a year.</b> DPR sometimes revises past data. To re-pull a year, request it from CalPIP again, "
          "upload the new zip, and delete the old zip for that year if there is one (select it in Cyberduck and press "
@@ -228,7 +230,7 @@ trouble = [
    "The zip is a summary or is missing columns. Request the year again (section 1, steps 2 and 3), replace the zip, "
    "and run Build data again."),
   ("The year you added isn't in the totals table.",
-   f"The zip isn't in {code('raw/calpip/')}, or it was unzipped before uploading. Check the folder and that the file "
+   f"The zip isn't in {code('calpip/')} in {code('pesticide-data-raw')}, or it was unzipped before uploading. Check the folder and that the file "
    "name ends in .zip."),
   ("Build data fails with a different error.",
    "Send Dylan the link to the failed run. The live site isn't affected."),

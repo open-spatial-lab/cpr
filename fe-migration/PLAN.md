@@ -64,7 +64,12 @@ At startup, fetch the manifest and read every data file from `${VITE_DATA_URL}/$
      - the date range expands to `start`/`end`;
      - `'*'` means no filter.
    - Easiest: turn `constructQuery` into `buildParams` that returns that object.
-   - Escape `'` in every literal (`lit()`). Values can arrive from saved or shared selections.
+   - Escape `'` in every literal (`lit()`). Values can arrive from saved or shared selections, so escaping alone isn't enough. The Python reference is safe because of three more things, and the port needs them too:
+     - numbers (the demographic thresholds) must pass `Number.isFinite`;
+     - `geo` and `series` must be keys of their lookup tables;
+     - `usetype` must be `AG`, `NON-AG` or `*`, and `start`/`end` must match `YYYY-MM`.
+
+     Never build SQL from a value that failed one of these.
 4. **Config.**
    - `map.tsx`: `endpoint` → `geo: 'county' | …`.
    - `filters.tsx`: timeseries `endpoint` → `series`; option `endpoint` → lookup name (mapping above).
@@ -82,7 +87,7 @@ At startup, fetch the manifest and read every data file from `${VITE_DATA_URL}/$
    - Delete `scripts/update-years.py` and the "Update years" step in `.github/workflows/test.yml`.
 8. **Env and docs.** Rename `VITE_DATA_ENDPOINT` to `VITE_DATA_URL` in `.env.example`, the README (drop the "NECTR endpoint" wording), and `.github/workflows/build.yml` (a new `VITE_DATA_URL` secret or var).
 9. **Parity test (new, required).** `scripts/parity.ts`, run with `pnpm parity` via `tsx`, using `@duckdb/node-api` as a devDependency.
-   - Import the TS builders from `src/utils/queries.ts` and run every case in `fixtures.json` (copy it into the repo) against **`${VITE_DATA_URL}/v1`, pinned, not the manifest's version**. The fixtures are snapshots of the old API, and `v1` was built from the same data. Later builds legitimately differ: for example, the new pipeline places 182,696 lbs on townships that the old one dropped, so `map_township_ag` changes by design.
+   - Import the TS builders from `src/utils/queries.ts` and run every case in `fixtures.json` (copy it into the repo) against **`${VITE_DATA_URL}/v1`, pinned, not the manifest's version**. The fixtures are snapshots of the old API, and `v1` was built from the same data. Later builds legitimately differ: for example, the new pipeline places 182,696 lbs on townships that the old one dropped, so `map_township_ag` changes by design. Don't port `EXPECTED_AFTER_V1`: against `v1` every case must match.
    - Compare the same way `reference_queries.py check()` does:
      - map row count equals `api_row_count`;
      - rows with use match on key;

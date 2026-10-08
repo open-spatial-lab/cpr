@@ -9,26 +9,29 @@ Step-by-step guide with screenshots: [docs/updating-the-data.pdf](docs/updating-
 > **Transition:** until the explorer reads from R2 (see the runbook), Publish data doesn't change the live site, which still reads nectr. The old AWS path, **Actions → Run AWS Batch Job (old pipeline)**, still updates it.
 
 1. Request a year's records from [CalPIP](https://calpip.cdpr.ca.gov) and download the zip.
-2. Upload the zip to `raw/calpip/` in the `pesticide-data` R2 bucket with Cyberduck and an R2 S3 key. A zip for a year that's already there replaces it, which is how you re-pull a year.
+2. Upload the zip to `calpip/` in the `pesticide-data-raw` R2 bucket with Cyberduck and an uploader key. A zip for a year that's already there replaces it, which is how you re-pull a year.
 3. In GitHub, go to **Actions → Build data → Run workflow**. It takes about 5 minutes and doesn't touch the live site. The run's summary page has the new version name, yearly totals next to the live site's, any chemicals missing from PAN's category sheet, and a preview link (`<site>?preview`).
 4. If it looks right, run **Actions → Publish data** with that version name. A blank version publishes the latest build.
 
-Each build is an immutable folder (`v<date>-<time>/`). Build data points `preview.json` at it; Publish data points `manifest.json` at it. The explorer reads `manifest.json` (or `preview.json` with `?preview`) on load, so publishing needs no FE rebuild. To undo a publish, run Publish data with the previous version, which every publish summary names.
+Each build is an immutable folder (`v<date>-<time>/`) in the `pesticide-data` bucket. Build data points `preview.json` at it; Publish data points `manifest.json` at it. The explorer reads `manifest.json` (or `preview.json` with `?preview`) on load, so publishing needs no FE rebuild. To undo a publish, run Publish data with the previous version, which every publish summary names.
 
-**R2 layout** (bucket `pesticide-data`)
-- `raw/`: inputs, a mirror of this repo's `data/` folder. People upload here; the workflow only reads it.
+**Two R2 buckets**, so an uploader key can never touch what the site serves:
+- `pesticide-data-raw`: inputs, private, a mirror of this repo's `data/` folder. Uploaders write here; CI only reads it.
   - `calpip/`: CalPIP zips, plus `calpip_<year>.parquet` for older years whose zips are gone
   - `pur/meta/`: `chemical.txt`, `product.txt`, `site.txt`, `AI Cat Data.xlsx`, `Restricted Pesticides.xlsx`. Names for codes newer than the `.txt` tables come from the CalPIP exports.
   - `census_data/ca-county-dpr-xwalk.csv`: DPR county codes to FIPS
   - `census_geos/crosswalks/*.parquet`, `output/ca-*-demography.parquet`: static geography, rebuilt only when boundaries or ACS data change (`cli download_geo`, `intersect`, `output`)
-- `v*/`: builds, immutable. `manifest.json`: the live one. `preview.json`: the latest build.
+- `pesticide-data`: what the site reads, public through a custom domain. Only CI (and admins) write here.
+  - `v*/`: builds, immutable. `manifest.json`: the live one. `preview.json`: the latest build. `duckdb-wasm/`: the browser query engine.
 
-**GitHub settings:** secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (an R2 API token with read and write on the bucket); variables `R2_BUCKET` and `SITE_URL` (the explorer's URL, used for the preview link).
+**GitHub settings:** a `data` environment limited to `main` holds the secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (an R2 token with read and write on both buckets). Variables: `R2_BUCKET`, `R2_RAW_BUCKET` and `SITE_URL` (the explorer's URL, used for the preview link). See [RUNBOOK.md](RUNBOOK.md).
 
-**Run locally:** sync `raw/` into `data/`, then run the same steps. `cli/check_clean.py` checks the cleaning logic on fake data in under a second.
+**Checks:** `cli/check_clean.py` and `cli/check_build.py` run the clean and build steps on tiny fake datasets in under a second. They run on every pull request and at the start of Build data.
+
+**Run locally:** copy the inputs into `data/` (`rclone copy`, not `sync`: `data/` also holds tracked files), then run the same steps.
 ```bash
 pip install -r requirements.txt
-python3 cli/check_clean.py
+python3 cli/check_clean.py && python3 cli/check_build.py
 python3 cli clean && python3 cli meta && python3 cli build_r2
 ```
 Output lands in `data/r2/`.
