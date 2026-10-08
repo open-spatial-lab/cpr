@@ -4,27 +4,31 @@ Data pipeline for [cpr-explorer-v2](https://github.com/dsi-rse/cpr-explorer-v2).
 
 ## Updating the data
 
-Step-by-step guide with screenshots: [docs/updating-the-data.pdf](docs/updating-the-data.pdf).
+Step-by-step guide with screenshots: [docs/updating-the-data.pdf](docs/updating-the-data.pdf) (regenerate it with `docs/guide/make_guide.py` when the steps change). Setup, the front-end cutover and maintenance: [RUNBOOK.md](RUNBOOK.md).
+
+> **Transition:** until the explorer reads from R2 (see the runbook), Publish data doesn't change the live site, which still reads nectr. The old AWS path, **Actions → Run AWS Batch Job (old pipeline)**, still updates it.
 
 1. Request a year's records from [CalPIP](https://calpip.cdpr.ca.gov) and download the zip.
-2. Upload the zip to `raw/calpip/` in the R2 bucket. A zip for a year that's already there replaces it, which is how you re-pull a year.
-3. In GitHub, go to **Actions → Build data → Run workflow**. It takes a few minutes and doesn't touch the live site. The run's summary page has the new version name, yearly totals next to the live site's, and a preview link (`<site>?preview`).
-4. If it looks right, run **Actions → Publish data** with the version left blank.
+2. Upload the zip to `raw/calpip/` in the `pesticide-data` R2 bucket with Cyberduck and an R2 S3 key. A zip for a year that's already there replaces it, which is how you re-pull a year.
+3. In GitHub, go to **Actions → Build data → Run workflow**. It takes about 5 minutes and doesn't touch the live site. The run's summary page has the new version name, yearly totals next to the live site's, any chemicals missing from PAN's category sheet, and a preview link (`<site>?preview`).
+4. If it looks right, run **Actions → Publish data** with that version name. A blank version publishes the latest build.
 
-Each build is an immutable folder (`v<date>-<time>/`). Build data points `preview.json` at it; Publish data points `manifest.json` at it. The explorer reads `manifest.json` (or `preview.json` with `?preview`) on load, so publishing needs no FE rebuild. To undo a publish, run Publish data with the previous version, which the summary of every publish run names.
+Each build is an immutable folder (`v<date>-<time>/`). Build data points `preview.json` at it; Publish data points `manifest.json` at it. The explorer reads `manifest.json` (or `preview.json` with `?preview`) on load, so publishing needs no FE rebuild. To undo a publish, run Publish data with the previous version, which every publish summary names.
 
-**R2 layout**
+**R2 layout** (bucket `pesticide-data`)
 - `raw/`: inputs, a mirror of this repo's `data/` folder. People upload here; the workflow only reads it.
   - `calpip/`: CalPIP zips, plus `calpip_<year>.parquet` for older years whose zips are gone
-  - `pur/meta/`: `chemical.txt`, `product.txt`, `site.txt`, `AI Cat Data.xlsx`, `Restricted Pesticides.xlsx`
-  - `census_data/ca-county-dpr-xwalk.csv`, `census_geos/crosswalks/*.parquet`, `output/ca-*-demography.parquet`: static geography, rebuilt only when boundaries or ACS data change (`cli download_geo`, `intersect`, `output`)
+  - `pur/meta/`: `chemical.txt`, `product.txt`, `site.txt`, `AI Cat Data.xlsx`, `Restricted Pesticides.xlsx`. Names for codes newer than the `.txt` tables come from the CalPIP exports.
+  - `census_data/ca-county-dpr-xwalk.csv`: DPR county codes to FIPS
+  - `census_geos/crosswalks/*.parquet`, `output/ca-*-demography.parquet`: static geography, rebuilt only when boundaries or ACS data change (`cli download_geo`, `intersect`, `output`)
 - `v*/`: builds, immutable. `manifest.json`: the live one. `preview.json`: the latest build.
 
 **GitHub settings:** secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (an R2 API token with read and write on the bucket); variables `R2_BUCKET` and `SITE_URL` (the explorer's URL, used for the preview link).
 
-**Run locally:** sync `raw/` into `data/`, then run the same three steps.
+**Run locally:** sync `raw/` into `data/`, then run the same steps. `cli/check_clean.py` checks the cleaning logic on fake data in under a second.
 ```bash
 pip install -r requirements.txt
+python3 cli/check_clean.py
 python3 cli clean && python3 cli meta && python3 cli build_r2
 ```
 Output lands in `data/r2/`.
@@ -52,5 +56,5 @@ Based at the University of Chicago Data Science Institute, the Open Spatial Lab 
 - Community & demographic data `data/community vars/` are from [American Community Survey 2021 (5-Year Estimates)](https://www.socialexplorer.com/data/ACS2021_5yr/metadata/), accessed via Social Explorer. Variables include: A04001 Hispanic of Latino by Race, A12002 Highest Educational Attainment for Population 25 Years and Over, A14006 Median Household Income, and A17004 Industry by Occupation for Employed Population 16 Years and Over. 
 
 ## Scripts
-- `scripts/download_pur.py` helps to download and parse PUR data from 2001 to 2021
-- `scripts/download_sections.py` helps to download GIS data
+- `cli/archive/download_pur.py` helps to download and parse PUR data from 2001 to 2021
+- `cli/download_sections.py` helps to download GIS data

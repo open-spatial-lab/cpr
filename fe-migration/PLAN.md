@@ -3,29 +3,31 @@
 **For:** an agent working in `dsi-rse/cpr-explorer-v2`.
 **Goal:** the FE stops calling nectr (`VITE_DATA_ENDPOINT`, a Lambda + DynamoDB + Webiny stack) and instead runs DuckDB-WASM in the browser. It reads static parquet files from Cloudflare R2 with HTTP range requests, so each query downloads only the columns and row groups it needs. Rows reaching `staticData` and the options UI must keep the shape they have today, so components don't change.
 
-Everything in this folder (`/Users/dh/Documents/GitHub/cpr/fe-migration/`) is input to this plan:
+Everything in the [`fe-migration/`](https://github.com/open-spatial-lab/cpr/tree/main/fe-migration) folder of `open-spatial-lab/cpr` is input to this plan:
 
 - `reference_queries.py` builds every query the FE makes, as DuckDB SQL. **Port it to TypeScript. It is the spec.**
-- `fixtures.json` holds 25 snapshots of the live nectr API (2026-10-08), covering every view and filter type. The reference SQL reproduces all 25 (`python fe-migration/reference_queries.py data/r2` → "all cases match the API").
-- `../cli/build_r2.py` is the pipeline step that produces the data files. You don't need to run it; the files are already built and on R2.
+- `fixtures.json` holds 25 snapshots of the live nectr API (2026-10-08), covering every view and filter type. The reference SQL reproduces all 25 against `v1` (`python fe-migration/reference_queries.py <base>/v1` → "all cases match the API").
+- `../cli/build_r2.py` is the pipeline step that produces the data files. You don't need to run it: `v1` is on R2 in the `pesticide-data` bucket, and the `manifest.json` / `preview.json` pointers are added during setup (`RUNBOOK.md` in the cpr repo).
 
 The FE repo had in-progress lint/prettier changes on `main` when this was written. Branch from the latest `origin/main`.
 
 ---
 
-## 1. Data on R2 (already uploaded, read-only for you)
+## 1. Data on R2 (read-only for you)
 
 `VITE_DATA_URL` is the bucket root, for example `https://<r2-custom-domain>`. Ask Dylan for the value.
 
 **Versions and the manifest.** Each data build is an immutable folder (`/v1`, `/v20270115-0930`, …), cached forever. `GET ${VITE_DATA_URL}/manifest.json` (served `no-cache`) says which one is live:
 
 ```json
-{"version": "v1", "start_year": 2017, "end_year": 2023}
+{"format": 1, "version": "v1", "start_year": 2017, "end_year": 2023}
 ```
+
+`format` is the file layout described below. If it isn't `1`, show the existing error state rather than querying: an older or newer build may have different files or columns.
 
 At startup, fetch the manifest and read every data file from `${VITE_DATA_URL}/${version}/…`. A pipeline run in the `cpr` repo publishes a new version by rewriting the manifest, so **data updates need no FE rebuild or deploy**. The paths in the table below are relative to the version folder.
 
-**Preview link.** The pipeline's "Build data" job points `${VITE_DATA_URL}/preview.json` (same shape) at each new build before anyone publishes it. When the page URL has `?preview`, read `preview.json` instead of `manifest.json`, and show a small fixed banner: "Previewing unpublished data (version X, years A–B)". That's the whole test page; reviewers check a build on the real site before running "Publish data".
+**Preview link.** The pipeline's "Build data" job points `${VITE_DATA_URL}/preview.json` (same shape) at each new build before anyone publishes it. When the page URL has `?preview`, read `preview.json` instead of `manifest.json`, and show a small fixed banner: "Previewing data version X (years A–B)". Don't call it unpublished: `preview.json` keeps pointing at the latest build after it's published. That's the whole test page; reviewers check a build on the real site before running "Publish data".
 
 | Path | Rows | Columns |
 |---|---|---|
@@ -53,7 +55,7 @@ At startup, fetch the manifest and read every data file from `${VITE_DATA_URL}/$
 2. **`src/utils/db.ts` (new).**
    - Lazy singleton `AsyncDuckDB`; `query(sql): Promise<Record<string, unknown>[]>` converting Arrow rows with `.toJSON()`.
    - Start initialization on app load, in idle time, so the first query doesn't pay for the WASM download.
-   - Bundles: Cloudflare Workers static assets cap single files at 25 MiB. Check the size of the DuckDB `.wasm` you'd ship. If it's over, load the bundle from jsDelivr (`getJsDelivrBundles()`) or from R2, not from `dist/`.
+   - Bundles: Cloudflare Workers static assets cap single files at 25 MiB, so don't ship the `.wasm` in `dist/`. Dylan has self-hosted a bundle on R2 at `${VITE_DATA_URL}/duckdb-wasm/1.33.1-dev57.0/` (the `duckdb-browser-eh` worker and wasm). Use it with `@duckdb/duckdb-wasm` at the matching version. The parquet extension is there too (`extensions/v1.5.4/wasm_eh/`), so run `SET custom_extension_repository = '${VITE_DATA_URL}/duckdb-wasm/1.33.1-dev57.0/extensions'` after init; the app then never fetches code from a third-party CDN. The data files were written by DuckDB 1.5.6 and the browser build is 1.5.4, the same release line. The parity test (step 9) confirms the browser build reads them correctly.
 3. **`src/utils/queries.ts` (new).** Port `where`, `use_by`, `map_query`, and `timeseries_query` from `reference_queries.py`, unchanged in logic.
    - Inputs are a params object `Record<string, string>` built exactly as `constructQuery` builds URL params today:
      - only filters whose label is in `filterKeys`;
