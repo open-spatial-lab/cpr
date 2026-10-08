@@ -174,7 +174,7 @@ def do_sections():
     .to_crs("EPSG:3310")
   sections_geo['SECTION_AREA'] = sections_geo['geometry'].area
   sections_geo = pd.DataFrame(sections_geo[['CO_MTRS', 'SECTION_AREA']])
-  sections_xwalk = pd.read_parquet(DATA_DIR / "census_geos", "crosswalks" / "sections-to-tracts.parquet")
+  sections_xwalk = pd.read_parquet(DATA_DIR / "census_geos" / "crosswalks" / "sections-to-tracts.parquet")
   sections_geo = sections_geo.rename(columns={"CO_MTRS": "comtrs"})
   tract_demog = pd.read_parquet(DATA_DIR / "census_data" / "ca-tract.parquet")
 
@@ -210,7 +210,7 @@ def do_sections():
   merged.to_parquet(DATA_DIR / "output" / "ca-section-demography.parquet")
 # %%
 def do_townships():
-  townships = gpd.read_file('../data/geo/CA-townships-2023.geojson')\
+  townships = gpd.read_file(DATA_DIR / 'geo' / 'CA-townships-2023.geojson')\
     .to_crs("EPSG:3310")
   townships['MeridianTownshipRange'] = townships['Meridian'] + " " + townships['TownshipRange']
   townships = townships.dissolve(by='MeridianTownshipRange').reset_index()

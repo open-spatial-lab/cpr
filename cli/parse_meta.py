@@ -366,7 +366,10 @@ def apply_count(id):
   return inner_apply_count
 
 def main():
-  calpip_data = pd.read_parquet(DATA_DIR / "calpip" / "calpip_full.parquet")
+  (DATA_DIR / "meta").mkdir(parents=True, exist_ok=True)
+  # only the columns used below: reading all of calpip_full peaks at ~9 GB
+  calpip_data = pd.read_parquet(DATA_DIR / "calpip" / "calpip_full.parquet",
+    columns=["chem_code", "site_code", "prodno", "lbs_chm_used", "monthyear"])
   calpip_data['YEAR'] = calpip_data['monthyear'].str.slice(0, 4)
   calpip_data['MONTH'] = calpip_data['monthyear'].str.slice(4, 6)
   use_stats_config = get_use_stats_config(calpip_data)
