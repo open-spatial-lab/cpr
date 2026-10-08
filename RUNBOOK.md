@@ -7,13 +7,14 @@ Bucket: `pesticide-data` (Cloudflare R2). People and CI use **S3 API keys** scop
 ## State on 2026-10-08
 
 - [x] Bucket `pesticide-data` exists.
-- [x] `v1/` is uploaded and matches the local build (schema, rows and sums of all 26 files). `reference_queries.py` passes 25/25 against it.
+- [x] `v1/` is uploaded and matches the local build (schema, rows and sums of all 26 files). `reference_queries.py` passes 25/25 reading it from R2.
 - [x] The DuckDB-WASM bundle is at `duckdb-wasm/1.33.1-dev57.0/`.
-- [ ] Inputs are at the bucket root (`calpip/`, `pur/meta/`, …), but Build data reads `raw/`. See setup step 3.
-- [ ] `manifest.json`, `preview.json` and `v1/manifest.json` are missing. See setup step 4.
-- [ ] `v1/` objects have no `Cache-Control` header. See setup step 4.
+- [x] Inputs are copied under `raw/` (34 files, 942 MB). The originals are still at the bucket root; see setup step 3.
+- [x] `manifest.json` and `preview.json` (both `no-cache`) and `v1/manifest.json` point at `v1`, and every `v1/` file has the immutable cache header.
+- [x] A rehearsal of Build data against R2 worked: the workflow's own download filters, then the build. It showed 0.00% for every year against `v1`, and no chemicals missing categories.
 - [ ] CORS can't be checked with an object-scoped key. See setup step 2.
 - [ ] GitHub secrets and variables aren't set. See setup step 5.
+- [ ] Custom domain. See setup step 1.
 
 ## One-time setup
 
@@ -27,12 +28,12 @@ The commands use rclone with a remote named `r2` (`rclone config`: type `s3`, pr
      "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges", "ETag"],
      "MaxAgeSeconds": 86400}]
    ```
-3. **Move inputs under `raw/`.** These are server-side copies, so nothing is downloaded. Copy only what the pipeline reads:
+3. **Move inputs under `raw/`** (done 2026-10-08). These are server-side copies, so nothing is downloaded. Copy only what the pipeline reads:
    ```bash
    rclone copy r2:pesticide-data r2:pesticide-data/raw --include "calpip/calpip_20*.parquet" --include "pur/meta/**" --include "census_data/ca-county-dpr-xwalk.csv" --include "census_geos/crosswalks/**" --include "output/ca-*-demography.parquet"
    ```
    The other root folders (`geo/`, `sections/`, `legacy/`, `live/`, `community vars/`, …) are reference copies of the old S3 bucket. Once the first build works, move them under `raw/` or delete them. Keep `duckdb-wasm/`.
-4. **Pointers and cache headers for `v1`.** The manifest is `data/r2/manifest.json`: `{"format": 1, "start_year": 2017, "end_year": 2023, "version": "v1"}`.
+4. **Pointers and cache headers for `v1`** (done 2026-10-08). The manifest is `data/r2/manifest.json`: `{"format": 1, "start_year": 2017, "end_year": 2023, "version": "v1"}`.
    ```bash
    rclone copyto data/r2/manifest.json r2:pesticide-data/v1/manifest.json
    rclone copyto data/r2/manifest.json r2:pesticide-data/manifest.json --header-upload "Cache-Control: no-cache"
