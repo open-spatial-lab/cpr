@@ -16,8 +16,12 @@ For developers. The step-by-step guide for people adding data is [docs/updating-
 - [x] `pesticide-data` holds `v1/` (it matches the local build; `reference_queries.py` passes 25/25 reading it from R2), `duckdb-wasm/1.33.1-dev57.0/`, and `manifest.json` / `preview.json` / `v1/manifest.json` pointing at `v1`. `v1/` has immutable cache headers.
 - [x] A rehearsal of Build data against R2 worked: the workflow's own download filters, then the build. It showed 0.00% for every year against `v1`.
 - [ ] `pesticide-data-raw` doesn't exist yet. The inputs are temporarily in `pesticide-data/raw/` and at its root. See step 3.
-- [ ] The `data` environment and the protection on `main`. See step 6.
-- [ ] CORS, the custom domain, keys, secrets and variables. See steps 1, 2, 5 and 6.
+- [x] GitHub (2026-10-08):
+  - the `data` environment exists, deployable from `main` only;
+  - `main` requires a pull request (no approval count, and admins can bypass);
+  - the variables `R2_BUCKET` and `R2_RAW_BUCKET` are set.
+- [ ] The `data` environment has no secrets yet. Add the CI key's `R2_*` (step 5). The old `AWS_*`/`BATCH_*` are still repo-level, so any branch workflow can read them until someone re-enters them in `data` and deletes the repo copies.
+- [ ] CORS, the custom domain and keys. See steps 1, 2 and 5.
 
 ## One-time setup
 
@@ -50,7 +54,7 @@ The commands use rclone with a remote named `r2` (`rclone config`: type `s3`, pr
    - **CI:** Object Read & Write on both buckets. It goes into the `data` environment (step 6).
    - **Uploaders (PAN):** Object Read & Write on **`pesticide-data-raw` only**, one token per person so each can be revoked alone. Send them three values: Server (`<account id>.r2.cloudflarestorage.com`), Access Key ID and Secret Access Key.
    - **Admins:** use your own keys for rclone. Never hand an uploader a key that reaches `pesticide-data`.
-6. **GitHub** (open-spatial-lab/cpr):
+6. **GitHub** (open-spatial-lab/cpr; the environment, `main` protection and bucket variables were done 2026-10-08):
    - Under Settings → Environments, create `data` and set Deployment branches to **Selected branches** with the rule `main`. Add the secrets `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` there.
    - Move the old pipeline's `AWS_*` and `BATCH_*` secrets into `data` too, then delete the repo-level copies. Until then, any workflow on any branch can read them.
    - Variables (not secret, repo level is fine): `R2_BUCKET=pesticide-data`, `R2_RAW_BUCKET=pesticide-data-raw`. Set `SITE_URL` only after the FE cutover, so Build summaries don't link to a preview the old site can't show.
