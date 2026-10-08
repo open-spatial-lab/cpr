@@ -1,12 +1,5 @@
+duckdb
 pandas
 pyarrow
-fastparquet
-np
-requests
-bs4
-boto3
-geopandas
-dotenv
 openpyxl
-polars
-fastexcel
+# static geography prep only (cli download_geo / intersect / output): geopandas requests bs4
