@@ -1,0 +1,32 @@
+# OLD PIPELINE, kept only until the explorer reads from R2 (see RUNBOOK.md). It starts the existing AWS Batch
+# job, whose Docker image still holds the old pandas code and updates nectr. Delete this file when AWS is retired.
+name: Run AWS Batch Job (old pipeline)
+
+on:
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-and-run:
+    name: Trigger AWS Batch Job
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Submit AWS Batch Job
+        run: |
+          aws batch submit-job \
+            --job-name ${{ secrets.BATCH_JOB_NAME }} \
+            --job-queue ${{ secrets.BATCH_QUEUE_NAME }} \
+            --job-definition ${{ secrets.BATCH_JOB_DEFINITION }}

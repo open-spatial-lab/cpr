@@ -6,7 +6,11 @@ name: Build data
 on:
   workflow_dispatch:
 
-concurrency: data
+permissions:
+  contents: read
+
+# its own group, so a queued Build never cancels a queued Publish (GitHub keeps one pending run per group)
+concurrency: build-data
 
 jobs:
   build:
@@ -29,9 +33,16 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
+      - name: Check the cleaning logic
+        run: python3 cli/check_clean.py
 
       - name: Download inputs
-        run: aws s3 sync "$BUCKET/raw" data --only-show-errors --exclude "calpip/calpip_full.parquet"
+        # only what the pipeline reads; raw/ may hold other reference files
+        run: |
+          aws s3 sync "$BUCKET/raw" data --only-show-errors --exclude "*" \
+            --include "calpip/calpip_20*.parquet" --include "calpip/*.zip" --include "pur/meta/*" \
+            --include "census_data/ca-county-dpr-xwalk.csv" --include "census_geos/crosswalks/*" \
+            --include "output/ca-*-demography.parquet"
 
       - name: Build
         run: |
@@ -51,7 +62,7 @@ jobs:
             echo "## Built \`$VERSION\`"
             echo "Years $(jq -r '"\(.start_year)–\(.end_year)"' manifest.json). Not live yet."
             if [ -n "$SITE_URL" ]; then echo "Preview it at $SITE_URL?preview"; fi
-            echo "When it looks right, run **Publish data** (leave the version blank to publish this build)."
+            echo "When it looks right, run **Publish data** with version \`$VERSION\`. A blank version publishes the latest build, which is this one unless Build data has run again since."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Compare with the live site

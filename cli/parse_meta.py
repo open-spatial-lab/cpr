@@ -2,6 +2,8 @@
 import pandas as pd
 from pathlib  import Path
 import os
+import duckdb
+from clean_calpip import code
 
 ONLY_USE_ACTIVE = os.getenv("ONLY_USE_ACTIVE", "true") == "true"
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -208,6 +210,7 @@ PUR_META_FILES = [
     },
     "outpath": DATA_DIR / "meta" / "chemicals.parquet",
     "sort_col": "chem_name",
+    "export_cols": ("CHEMICAL_CODE", "CHEMICAL_NAME", "chemname"),
   },
   {
     "file": "site.txt",
@@ -215,7 +218,8 @@ PUR_META_FILES = [
     "calpip_col": "site_code",
     "id_col": "site_code",
     "outpath": DATA_DIR / "meta" / "sites.parquet",
-    "sort_col": "site_name"
+    "sort_col": "site_name",
+    "export_cols": ("SITE_CODE", "SITE_NAME", "site_name"),
   },
   {
     "file": "product.txt",
@@ -227,7 +231,8 @@ PUR_META_FILES = [
       "prodno": "product_code"
     },
     "outpath": DATA_DIR / "meta" / "products.parquet",
-    "sort_col": "product_name"
+    "sort_col": "product_name",
+    "export_cols": ("PRODUCT_NUMBER", "PRODUCT_NAME", "product_name"),
   }
 ]
 
@@ -279,9 +284,20 @@ def get_use_stats_config(calpip_data):
     }
   ]
 
+def names_from_exports(code_col, name_col):
+  # code -> name from the CalPIP exports themselves, newest year's name; '0' is what junk codes clean to
+  return duckdb.sql(f"""select {code(code_col)} AS code, arg_max({name_col}, try_cast(try_cast(YEAR as double) as int)) AS name
+    from read_parquet('{DATA_DIR}/calpip/calpip_20*.parquet', union_by_name=true)
+    where nullif({name_col}, 'nan') is not null group by 1 having code <> '0'""").df()
+
 def read_pur_meta(config, calpip_data):
   df = pd.read_csv(pur_meta_dir / config['file'], encoding='latin1')
   df[config['id_col']] = df[config['id_col']].astype(str)
+  # the PUR code tables in raw/pur/meta lag behind new years: name codes they don't have from the exports
+  code_col, name_col, table_name_col = config['export_cols']
+  names = names_from_exports(code_col, name_col)
+  names = names[~names['code'].isin(df[config['id_col']])]
+  df = pd.concat([df, names.rename(columns={'code': config['id_col'], 'name': table_name_col})], ignore_index=True)
   if ONLY_USE_ACTIVE:
     valid_ids = calpip_data[config['calpip_col']].unique()
     if ONLY_USE_ACTIVE:

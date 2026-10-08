@@ -1,6 +1,7 @@
 # Markdown table of yearly totals in a new build vs the live one, for the "Build data" job's summary page.
 #   python3 cli compare <new build dir> [<live build dir>]
 import sys
+from pathlib import Path
 import duckdb
 
 
@@ -30,6 +31,18 @@ def main():
     fmt = lambda v: f"{v:,.0f}" if v is not None else "-"
     print(f"| {yr} | {fmt(chm)} | {fmt(prd)} | {change(chm, live_chm) if live_dir else '-'} / {change(prd, live_prd) if live_dir else '-'} |")
   print("\nYears that were already published should show 0.00% unless that year was re-pulled from CalPIP.")
+  # PAN's category sheet can't be derived from CalPIP, so flag chemicals in the data that it doesn't list.
+  # Compare with the sheet itself: chem_attrs leaves out adjuvants on purpose, as nectr did.
+  sheet = Path(__file__).resolve().parent.parent / "data" / "pur" / "meta" / "AI Cat Data.xlsx"
+  if not sheet.exists():
+    return
+  import pandas as pd
+  listed = pd.read_excel(sheet, usecols=["CHEM_CODE"])["CHEM_CODE"].astype(str).tolist()
+  missing = duckdb.sql(f"""select chem_code::varchar, chem_name from read_json('{new_dir}/lookup/chemicals.json')
+    where chem_code::varchar not in (select unnest(?::varchar[])) order by chem_name""", params=[listed]).fetchall()
+  if missing:
+    print(f"\n**{len(missing)} chemicals have no class, use type or health information**, so those filters skip them. "
+          "Add them to `raw/pur/meta/AI Cat Data.xlsx`: " + ", ".join(f"{name} ({code})" for code, name in missing))
 
 
 if __name__ == "__main__":

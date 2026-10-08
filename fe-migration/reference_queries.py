@@ -25,8 +25,8 @@ def lit(csv):
 
 
 def where(p):
-  w = [f"monthyear between '{p['start']}' and '{p['end']}'"]
-  if p.get("usetype", "*") != "*": w.append(f"usetype = '{p['usetype']}'")
+  w = [f"monthyear between {lit(p['start'])} and {lit(p['end'])}"]
+  if p.get("usetype", "*") != "*": w.append(f"usetype = {lit(p['usetype'])}")
   if p.get("aerial_ground", "*") != "*": w.append(f"aerial_ground in ({lit(p['aerial_ground'])})")
   if "county" in p: w.append(f"county_cd in ({lit(p['county'])})")
   if "site" in p: w.append(f"site_code in ({lit(p['site'])})")
@@ -76,6 +76,9 @@ def timeseries_query(series, p):
 
 
 SERIES_KEY = {"class": "ai_class", "usetype": "ai_type", "ai": "chem_code", "product": "prodno"}
+# builds after v1 take township IDs straight from COMTRS, which places 1,405 rows the old API dropped
+# (cli/check_clean.py checks the township derivation itself)
+EXPECTED_AFTER_V1 = {"map_township_ag"}
 
 
 def check():
@@ -100,9 +103,11 @@ def check():
       r = g.get(tuple(e[k] for k in key))
       if r is None: problems.append(f"missing {[e[k] for k in key]}"); continue
       # use/ stores float32, so filtered totals can differ from the API past the 6th significant digit
-      problems += [f"{[e[k] for k in key]} {c}: {r[c]} vs api {e[c]}" for c in cols if abs(r[c] - e[c]) > max(0.02, 1e-4 * abs(e[c]))]
-    failures += bool(problems)
-    print(f"{'ok  ' if not problems else 'FAIL'} {case['name']:26} {problems[:3]}")
+      # `not <=` so NaN counts as a mismatch
+      problems += [f"{[e[k] for k in key]} {c}: {r[c]} vs api {e[c]}" for c in cols if not abs(r[c] - e[c]) <= max(0.02, 1e-4 * abs(e[c]))]
+    expected = problems and case["name"] in EXPECTED_AFTER_V1
+    failures += bool(problems) and not expected
+    print(f"{'ok  ' if not problems else 'diff (expected after v1)' if expected else 'FAIL'} {case['name']:26} {problems[:3]}")
   print("all cases match the API" if not failures else f"{failures} cases differ")
   return failures
 

@@ -1,17 +1,16 @@
 # Builds the static files the FE queries in the browser with DuckDB-WASM (replaces nectr).
-# Inputs are the outputs of the `clean`, `meta` and `output` steps; writes DATA_DIR/r2/.
+# Inputs: the outputs of `clean` and `meta`, plus the static geography from `intersect` and `output`. Writes data/r2/.
 #   use/{geo}.parquet      one row per geo x month x usetype x method x site x product x AI
 #   summary/{geo}.parquet  same without site/product/AI, for queries that don't filter on those
 #   geo/{geo}.parquet      one row per geo: name, land area, demography
 #   lookup/*.json          filter options, same shape as the old nectr option endpoints
 #   lookup/chem_attrs.parquet  chem_code -> class / use type / health ids, for SQL joins
-#   manifest.json          year range of the data
+#   manifest.json          year range and file format of the build
 import json
-import os
 from pathlib import Path
 import duckdb
 
-DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).resolve().parent.parent / "data"))
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 OUT = DATA_DIR / "r2"
 SQ_M_PER_SQ_MI = 2589988.110336
 DEMOG_COLS = [
@@ -83,7 +82,8 @@ def main():
     to '{OUT}/lookup/chem_attrs.parquet' {PARQUET}""")
   # the Build data workflow adds the version; Publish data makes it /manifest.json, which the FE reads at startup
   start, end = con.sql("select min(monthyear)[1:4]::int, max(monthyear)[1:4]::int from base").fetchone()
-  (OUT / "manifest.json").write_text(json.dumps({"start_year": start, "end_year": end}))
+  # format: bump when the layout or columns change, so the FE can refuse builds it doesn't understand
+  (OUT / "manifest.json").write_text(json.dumps({"format": 1, "start_year": start, "end_year": end}))
 
 
 if __name__ == "__main__":

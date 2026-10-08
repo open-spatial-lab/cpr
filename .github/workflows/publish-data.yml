@@ -10,7 +10,10 @@ on:
         description: Version to publish, e.g. v20270115-0930. Blank = the latest build.
         required: false
 
-concurrency: data
+permissions: {}
+
+# its own group, so it starts right away instead of waiting on (or being cancelled by) a queued Build
+concurrency: publish-data
 
 jobs:
   publish:
@@ -40,10 +43,11 @@ jobs:
             echo "::error::No build found at $SRC"; exit 1
           fi
           PREVIOUS=$(aws s3 cp "$BUCKET/manifest.json" - 2>/dev/null | jq -r '.version // empty' || true)
-          PREVIOUS=${PREVIOUS:-nothing}
           aws s3 cp manifest.json "$BUCKET/manifest.json" --content-type application/json --cache-control no-cache --only-show-errors
           {
             echo "## Published \`$(jq -r .version manifest.json)\`"
-            echo "Years $(jq -r '"\(.start_year)–\(.end_year)"' manifest.json). Replaced \`$PREVIOUS\`."
-            echo "To undo, run Publish data with version \`$PREVIOUS\`."
+            echo "Years $(jq -r '"\(.start_year)–\(.end_year)"' manifest.json)."
+            if [ -n "$PREVIOUS" ]; then
+              echo "Replaced \`$PREVIOUS\`. To undo, run Publish data with version \`$PREVIOUS\`."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"

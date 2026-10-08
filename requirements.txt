@@ -1,5 +1,6 @@
-duckdb
-pandas
-pyarrow
-openpyxl
+# pinned to the versions the pipeline was verified with: the parquet files are a contract with the front end
+duckdb==1.5.6
+pandas==3.0.6
+pyarrow==25.0.1
+openpyxl==3.1.5
 # static geography prep only (cli download_geo / intersect / output): geopandas requests bs4

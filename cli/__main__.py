@@ -1,7 +1,7 @@
 import sys
 import importlib
 
-# pipeline (see .github/workflows/update-data.yml): clean -> meta -> build_r2
+# pipeline (see .github/workflows/build-data.yml): clean -> meta -> build_r2, then compare against the live build
 # static geography prep, rerun only when boundaries or ACS data change: download_geo, intersect, output
 COMMANDS = {
   "clean": "clean_calpip",

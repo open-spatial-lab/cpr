@@ -3,6 +3,7 @@
 #   2. every calpip_{year}.parquet -> calpip_full.parquet, cleaned and typed
 # Older calpip_{year}.parquet files came from the previous pandas version (missing values as 'nan', codes like
 # '3551.0'); the cleaning below handles both. DuckDB streams, so memory stays flat as years are added.
+import shutil
 import zipfile
 from pathlib import Path
 import duckdb
@@ -37,8 +38,13 @@ def convert_zips(con):
       txt = next((n for n in z.namelist() if n.lower().endswith(".txt")), None)
       if not txt:
         raise ValueError(f"{zip_path.name} has no .txt file inside. Upload the zip exactly as CalPIP sent it.")
-      txt_path = Path(z.extract(txt, CALPIP_DIR / "unzipped"))
-    src = f"read_csv('{txt_path}', delim='\t', header=true, all_varchar=true)"
+      # fixed name: the name inside an uploaded zip never reaches the SQL below
+      txt_path = CALPIP_DIR / "unzipped.txt"
+      with z.open(txt) as src_file, open(txt_path, "wb") as out:
+        shutil.copyfileobj(src_file, out)
+    # null_padding / strict_mode off: CalPIP exports can contain a line break inside a field (2021 has one),
+    # which splits that record in two; pandas read those rows the same way
+    src = f"read_csv('{txt_path}', delim='\t', header=true, all_varchar=true, null_padding=true, strict_mode=false)"
     # zips are uploaded by hand: fail with a readable message if this isn't a full, unsummarized CalPIP export
     missing = sorted(set(REQUIRED) - {c[0] for c in con.sql(f"describe select * from {src}").fetchall()})
     if missing:
